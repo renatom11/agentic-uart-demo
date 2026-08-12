@@ -133,3 +133,50 @@ whole history including this one.
 - scripts/policy.sh
 - scripts/test_protocol.sh
 - tasks/BOARD.md
+
+---
+## [J-orchestrator-0002] 2026-08-13T00:20:00Z | task:none | WO-0001 issued with the RTL deliberately withheld, and the board states what this program has not done
+
+### Trigger
+The specification is committed (9d980e1) and the RTL is committed (06c73d3).
+The benches that will grade the design can now be commissioned.
+
+### Reasoning
+- **The packet withholds `rtl/**` on purpose, and says so in its own text.** The
+  design exists and is committed; it is withheld from the assignee, not absent.
+  A bench written by a seat that has read the implementation tends to assert
+  what the implementation does rather than what the specification requires, and
+  a suite built that way is green whether or not the design is correct. This is
+  the one separation this program enforces at the session level: the assignee is
+  a spawned session with its own context, instructed not to open the directory.
+- **Two constraints are carried into the packet because the specification alone
+  would not force them.** REQ-011's sweep must be driven by a bench model the
+  assignee writes, not by the DUT's own transmitter — a receiver checked against
+  its own transmitter shares a time base with its stimulus and can demonstrate
+  only self-consistency. REQ-005 must be checked in clock cycles, because a
+  check denominated in the design's own tick is satisfied by a design whose tick
+  period is wrong.
+- **The assignee is instructed that a failing check is a legitimate return**, and
+  explicitly told not to adjust an expected value to make a check pass. Without
+  that instruction the incentive runs the other way: the seat is graded on
+  delivering a suite, and the cheapest green suite is one fitted to the design.
+
+### The board now records three things this program has NOT done
+Written down now, while they are true, rather than discovered by a reader later:
+- No mutation campaign. Nothing yet establishes these benches would catch a
+  defect. A green suite is evidence the design meets the checks written — not
+  that the checks are searching for anything.
+- No synthesis. Elaboration and simulation only; no vendor tool has seen this
+  code, so any area or timing claim is unverified.
+- One session wearing several hats. Specification, RTL and orchestration were
+  authored in one session under separate seat identities and separate journals.
+  Only the benches are written under genuine session-level blinding. Claiming
+  the full organizational separation here would be false.
+
+G0 is recorded as compressed rather than as satisfied: the sponsor delegated all
+calls to the orchestrator, and branch protection is not configured, so the
+append-only journal holds by convention plus CI rather than by server-side rule.
+
+### Files-in-this-commit
+- agents/handoffs/WO-0001-uart-lite-benches.md
+- tasks/BOARD.md
