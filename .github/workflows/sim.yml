@@ -1,0 +1,51 @@
+name: sim
+
+# The simulation lane for uart_lite, instantiated at M1 per ADR-0008.
+#
+# Honours the R-CI rules from .github/workflows/build.yml.template:
+#   R-CI-a  its own job, never a step in another
+#   R-CI-b  installed from the runner distribution's archive; a failed install
+#           fails the job rather than silently skipping the lane
+#   R-CI-c  tool versions recorded into a sidecar artifact, not only the log
+#   R-CI-d  not applicable: this lane is BLOCKING from the day it lands, so
+#           there is no de-gating condition to write
+#   R-CI-e  build products live in build/, which is .gitignore'd
+#   R-CI-f  on failure the full simulation log is printed
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  sim:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Icarus Verilog (distribution archive only)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y iverilog
+
+      - name: Record tool versions (R-CI-c)
+        run: |
+          mkdir -p "$RUNNER_TEMP/toolinfo"
+          {
+            echo "commit: $GITHUB_SHA"
+            iverilog -V | head -1
+            vvp -V | head -1
+            echo "ubuntu: $(lsb_release -ds 2>/dev/null || cat /etc/os-release | head -1)"
+          } | tee "$RUNNER_TEMP/toolinfo/versions.txt"
+
+      - name: Elaborate
+        run: iverilog -g2012 -Wall -o /tmp/elab.out -f rtl/uart_lite.f
+
+      - name: Run the suite
+        run: bash test/run.sh
+
+      - name: Upload tool versions
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sim-toolinfo
+          path: ${{ runner.temp }}/toolinfo/

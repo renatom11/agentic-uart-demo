@@ -180,3 +180,31 @@ append-only journal holds by convention plus CI rather than by server-side rule.
 ### Files-in-this-commit
 - agents/handoffs/WO-0001-uart-lite-benches.md
 - tasks/BOARD.md
+
+---
+## [J-orchestrator-0003] 2026-08-13T00:35:00Z | task:none | The simulation lane lands blocking, because a suite that is allowed to be red is not a gate
+
+### Trigger
+ADR-0008 fixes the toolchain (d16f4f8). CI is the authoritative build
+environment under PROTOCOL §10, so the lane is written now rather than after the
+benches land, to remove the temptation to shape the lane around a known result.
+
+### Reasoning
+- **Blocking from the first day, with no de-gating condition.** The build CI
+  template's R-CI-d allows a lane to land non-blocking provided the condition
+  for removing the gate is written down at landing. I am not using that
+  allowance. A simulation lane that is permitted to be red does not gate
+  anything, and the de-gating clause is the mechanism by which a lane stays
+  advisory forever. The lane blocks now, before any bench exists to be green.
+- Elaboration is a separate step from the suite, so a syntax break and a failing
+  assertion are distinguishable in the job log without opening the run.
+- Tool versions go to a sidecar artifact and not only the log (R-CI-c): a log is
+  rotated and a claim about "which simulator produced this result" outlives it.
+- `build/` is .gitignore'd in this same commit rather than in a later one
+  (R-CI-e).
+- The `journal-check` workflow is untouched. It re-walks the whole history on
+  every push, which is the check that cannot be done incrementally.
+
+### Files-in-this-commit
+- .github/workflows/sim.yml
+- .gitignore

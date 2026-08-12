@@ -6,3 +6,7 @@ tools/data/
 # Editor / OS noise
 *.swp
 .DS_Store
+
+# Simulation build products
+build/
+*.vcd
