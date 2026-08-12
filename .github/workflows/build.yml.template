@@ -1,0 +1,133 @@
+# build.yml.template — the program's build/test CI, instantiated at M1.
+#
+# INERT until instantiated: the .template suffix keeps GitHub from running
+# this file. After the M1 toolchain ADR is accepted (BOOTSTRAP.md, Stage 2):
+#
+#     git mv .github/workflows/build.yml.template .github/workflows/build.yml
+#
+# then fill every <SLOT> below for the chosen toolchain and delete the
+# ready-made blocks that do not apply. Only the orchestrator stages
+# .github/** (PROTOCOL §6 R7); this instantiation is an orchestrator commit
+# citing the toolchain ADR.
+#
+# CI is the authoritative build environment: no gate signature rests on a
+# local build (PROTOCOL §10). Recipes and rationale for everything in this
+# file: docs/playbooks/ci-evidence.md.
+#
+# ── Adding a simulator / external-tool lane later: honor the R-CI rules ──
+# (ci-evidence.md §7; record the walk in the lane's ADR)
+#   R-CI-a  own job, never a step in `build` (attributability; keeps lane
+#           artifacts away from the determinism gate below)
+#   R-CI-b  install from the runner distribution's archive
+#           (apt-get install -y <pkg>) — no third-party archives, no source
+#           builds; a failed install fails the job, never a silent skip
+#   R-CI-c  tool versions recorded into a sidecar artifact, not only the log
+#   R-CI-d  if the lane lands non-blocking, the de-gating condition is
+#           WRITTEN HERE at landing, and the gate comes off in its own
+#           later commit citing it
+#   R-CI-e  every lane artifact outside the checkout ($RUNNER_TEMP) or
+#           .gitignore'd in the same change
+#   R-CI-f  on failure, adjudication evidence printed to the log
+#           (promotion-block form for anything long); workflow-artifact
+#           uploads are ephemeral and journals must say so
+#   R-CI-g  same push trigger as build — never a schedule
+#   R-CI-h  no fetch step; reference inputs live in the checkout
+#
+# Each verification lane should reach this file through ONE wrapper script
+# in the lane's own write scope (e.g. tools/<lane>_checks.sh) added as a
+# single step — the lane then evolves its checks without touching .github
+# (ci-evidence.md §6).
+
+name: build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # <SLOT: set up toolchain>
+      # Install/pin the M1 toolchain exactly as the toolchain ADR records it
+      # (version pins live in committed project files, not in this step).
+      # - name: Set up toolchain
+      #   run: <...>
+
+      # <SLOT: install dependencies>
+      # One command, reproducible from the committed manifests.
+      # - name: Install dependencies
+      #   run: <...>
+
+      # <SLOT: build>
+      # - name: Build
+      #   run: <...>
+
+      # <SLOT: test>
+      # The suite the sign-off packets cite. If the test runner has a
+      # snapshot/expected-output promotion mechanism, wrap it with the
+      # promotion-block failure handler below; otherwise delete the wrapper
+      # and keep a plain run step.
+      #
+      # ── READY-MADE: promotion-block failure handler ──────────────────────
+      # (delete if not applicable — i.e. if test failures never need file
+      #  content shipped back for repair)
+      # On failure: let the runner's promotion mechanism apply corrections
+      # to the checkout, then print sha256 + base64 -w 400 of every
+      # changed/produced source between --- FILE markers, at the log tail —
+      # log-fetch windows truncate long diffs, and the checksum makes the
+      # promotion byte-verifiable at apply time (ci-evidence.md §1).
+      - name: Run tests
+        run: |
+          <SLOT: test command> || {
+            <SLOT: promotion command, or `true` if none> || true
+            echo '=== PROMOTION BLOCK (tests): sha256 + base64 -w 400 of every changed source ==='
+            git diff --name-only | while read -r f; do
+              echo "--- FILE $f"
+              sha256sum "$f"
+              base64 -w 400 "$f"
+              echo "--- END $f"
+            done
+            echo '=== END PROMOTION BLOCK ==='
+            exit 1
+          }
+
+      # <SLOT: generate build products>
+      # Any generated-output step whose byte-determinism the next gate
+      # checks (e.g. HDL generation from the toolchain's source form).
+      # - name: Generate outputs
+      #   run: <...>
+
+      # ── READY-MADE: staged-diff byte-determinism gate ────────────────────
+      # (delete if not applicable — i.e. if no build product is committed to
+      #  the tree)
+      # Catches three failures with one check: an output that changed but
+      # was never promoted; generation that is not byte-reproducible; a
+      # produced file never committed (plain `git diff` ignores untracked
+      # files, so stage everything first). On failure the printed block IS
+      # the repair source (ci-evidence.md §2).
+      - name: Verify nothing was left unpromoted or non-deterministic
+        run: |
+          git add -A
+          git diff --cached --exit-code || {
+            echo '=== PROMOTION BLOCK: sha256 + base64 -w 400 of every staged path ==='
+            git diff --cached --name-only | while read -r f; do
+              if [ -f "$f" ]; then
+                echo "--- FILE $f"
+                sha256sum "$f"
+                base64 -w 400 "$f"
+                echo "--- END $f"
+              else
+                echo "--- DELETED $f"
+              fi
+            done
+            echo '=== END PROMOTION BLOCK ==='
+            exit 1
+          }
+
+      # <SLOT: lane wrapper scripts>
+      # One step per verification lane's own seam (ci-evidence.md §6), e.g.:
+      # - name: DV mechanical checks
+      #   run: tools/dv_checks.sh

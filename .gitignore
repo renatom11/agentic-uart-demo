@@ -1,0 +1,8 @@
+# Toolchain build outputs: added at M1 by the toolchain ADR
+
+# Large data never committed; fetch scripts + checksum manifests live in tools/
+tools/data/
+
+# Editor / OS noise
+*.swp
+.DS_Store

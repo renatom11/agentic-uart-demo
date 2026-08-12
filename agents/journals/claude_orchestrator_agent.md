@@ -1,0 +1,135 @@
+# Journal: claude_orchestrator_agent
+
+- **Agent**: orchestrator (main session)
+- **Charter**: agents/charters/orchestrator.md
+- **Format**: v2 — entry grammar in agents/PROTOCOL.md §4
+
+This file is APPEND-ONLY. Content may only ever be added after the last line;
+nothing above it is ever edited. Enforced by scripts/agent_commit.sh and CI.
+
+---
+## [J-orchestrator-0001] 2026-08-12T23:20:00Z | task:none | Shell seeded into agentic-uart-demo: seven seats, two dormant seats dropped, self-test green at 38/38
+
+### Trigger
+Sponsor commission (2026-08-12): build a real, working proof of concept of
+this framework end to end — real SystemVerilog RTL, a real testbench, real
+simulation runs — on a small design, in a repository of its own, so the NIC
+program and this demonstration stay separate. The example design is uart_lite:
+115200 baud 8N1 on a 50 MHz clock. Sponsor direction was "you make all the
+calls", with one stated outcome: a working testbench worth showing off.
+
+### Inputs
+- Source shell: renatom11/generic-agentic-fpga-org at pinned SHA
+  295f26891e60d092075bbfa97eee07881de2d5db.
+- Target: renatom11/agentic-uart-demo, created empty by the sponsor.
+
+### Reasoning
+- **Copied by file rather than by fork.** The shell's README documents forking
+  from a hosted upstream, which is the right pattern for an enterprise install:
+  host the shell once internally, fork per project. For one demo repository the
+  sponsor had already created, a file copy is the same result without the
+  ceremony. The shell's own docs were left unedited.
+- **Two seats dropped rather than carried dormant.** data_wrangler exists to
+  fetch and packetize external market data; formal_dv exists to drive SAT-based
+  equivalence proofs. A UART peripheral will wake neither. Carrying them would
+  leave ORG_CHART.md advertising seats this program will never spawn, and a
+  roster that overstates the organization is a roster that lies.
+- **The inherited journal history was NOT carried, and that reversed my first
+  decision.** I initially copied the shell's thirteen seeding entries into this
+  repository's journals as provenance. That was wrong, and the enforcement
+  caught it: check_journals.sh refused the genesis commit with "appended region
+  has 14 entry headers, expected 1 (R5)". The rule was right on a deeper ground
+  than the one it states. Those entries describe commits made in
+  generic-agentic-fpga-org, by a session working on that repository. Carrying
+  them here would make this repository's journal assert work that was never
+  done here — precisely the dishonesty the journal rule exists to prevent. The
+  shell's provenance belongs in this entry, as a pinned SHA, and it is above.
+- **The path lanes needed no change.** The shell already lanes RTL to rtl/** and
+  benches to test/**; it never assumed a language, so moving from the source
+  program's Hardcaml to SystemVerilog touches no enforcement. That is the shell
+  doing its job.
+- Toolchain choice deferred to its own ADR rather than settled here.
+
+### Actions
+- Copied the shell tree excluding .git and the two dormant seats.
+- Removed the dormant seats from ORG_CHART.md (graph nodes, activation edges,
+  style lines, roster rows), agents/journals/INDEX.md, and the KNOWN_AGENTS /
+  WORKER_AGENTS / write-scope tables in scripts/policy.sh.
+- Truncated every journal to its header, so this journal starts at entry 0001.
+- Restored an empty docs/reports/audit/ with a .gitkeep; made scripts executable.
+
+### Evidence
+- `bash -n scripts/policy.sh` — clean after the roster edit.
+- `bash scripts/test_protocol.sh` → **38 passed, 0 failed**, run in this
+  repository against the edited policy.sh, not inherited from the source.
+- `grep -c "data_wrangler\|formal_dv"` → 0 in ORG_CHART.md, INDEX.md, policy.sh.
+- `iverilog -V` → Icarus Verilog version 12.0 (stable), installed this session.
+
+### Enforcement note — the one commit that cannot pass the gate
+This is the repository's genesis commit: there is no HEAD for R3's append-only
+check to diff against, so `agent_commit.sh` cannot run on it. It is made with
+plain `git commit`, and it is the only commit in this repository's history that
+will ever be made that way. Every commit after it goes through
+`scripts/agent_commit.sh`, and `scripts/check_journals.sh --all` re-verifies the
+whole history including this one.
+
+### Files-in-this-commit
+- .claude/agents/architect_docs_lead.md
+- .claude/agents/auditor.md
+- .claude/agents/dv_lead.md
+- .claude/agents/rtl_lead.md
+- .claude/agents/rtl_module_dev.md
+- .claude/agents/tb_writer.md
+- .github/workflows/build.yml.template
+- .github/workflows/journal-check.yml
+- .gitignore
+- BOOTSTRAP.md
+- CLAUDE.md
+- ORG_CHART.md
+- README.md
+- agents/PROTOCOL.md
+- agents/charters/architect_docs_lead.md
+- agents/charters/auditor.md
+- agents/charters/dv_lead.md
+- agents/charters/orchestrator.md
+- agents/charters/rtl_lead.md
+- agents/charters/rtl_module_dev.md
+- agents/charters/tb_writer.md
+- agents/handoffs/README.md
+- agents/handoffs/templates/BUG-template.md
+- agents/handoffs/templates/CAMPAIGN-template.md
+- agents/handoffs/templates/RV-template.md
+- agents/handoffs/templates/SEALED-predictions-template.md
+- agents/handoffs/templates/SO-template.md
+- agents/handoffs/templates/WO-template.md
+- agents/journals/INDEX.md
+- agents/journals/claude_architect_docs_lead_agent.md
+- agents/journals/claude_auditor_agent.md
+- agents/journals/claude_dv_lead_agent.md
+- agents/journals/claude_rtl_lead_agent.md
+- agents/journals/workers/claude_rtl_module_dev_agent.md
+- agents/journals/workers/claude_tb_writer_agent.md
+- docs/LESSONS.md
+- docs/SPONSOR.md
+- docs/adr/ADR-0001-org-design.md
+- docs/adr/ADR-0002-enforcement-honesty.md
+- docs/adr/ADR-0003-ci-authority-and-evidence.md
+- docs/adr/ADR-0004-a-seal-is-a-file-not-a-sentence.md
+- docs/adr/ADR-0005-journal-volume-chain.md
+- docs/adr/ADR-0006-mutation-campaign-discipline.md
+- docs/adr/ADR-0007-blinding-regime.md
+- docs/gates/G0-checklist.md
+- docs/gates/templates/module-ready-checklist.md
+- docs/gates/templates/phase-accept-checklist.md
+- docs/gates/templates/spec-freeze-checklist.md
+- docs/playbooks/ci-evidence.md
+- docs/playbooks/mutation-campaign.md
+- docs/playbooks/packet-splitting.md
+- docs/playbooks/review.md
+- docs/reports/audit/.gitkeep
+- docs/specs/SPEC-TEMPLATE.md
+- scripts/agent_commit.sh
+- scripts/check_journals.sh
+- scripts/policy.sh
+- scripts/test_protocol.sh
+- tasks/BOARD.md
