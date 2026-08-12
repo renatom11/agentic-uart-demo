@@ -68,3 +68,37 @@ describes exists. Its claims become checkable when the benches cite them.
 ### Files-in-this-commit
 - docs/specs/SPEC-uart_lite.md
 - docs/specs/requirements.md
+
+---
+## [J-architect_docs_lead-0002] 2026-08-13T00:30:00Z | task:none | ADR-0008 fixes the toolchain at SystemVerilog and Icarus, and records the two things that choice gives up
+
+### Trigger
+CI cannot be written against an undecided toolchain, and CI is the authoritative
+build environment under PROTOCOL §10. The decision is needed before the
+simulation lane can land.
+
+### Reasoning
+- SystemVerilog directly, not Hardcaml. The sponsor asked for it, and for this
+  repository the request is the point: the shell claims to be language-agnostic,
+  and a demonstration that reuses the source program's language demonstrates
+  nothing about that claim.
+- Icarus over Verilator, and not on quality. Verilator is faster and lints
+  harder, but its normal mode wants a C++ harness, which splits the bench across
+  two languages and puts a layer between the specification and the checks that a
+  reader would have to learn before auditing a single assertion. For a design
+  this size that cost is not worth paying. Recorded with the condition that
+  would reopen it: the design growing, or lint-grade static checking becoming a
+  gate requirement.
+- Vendor simulators rejected on licence: CI could not run one, so no gate
+  signature could rest on it.
+
+### The consequences are written down as limitations, not omitted
+- **No synthesis.** Icarus does not synthesise. REQ-017's area and timing claims
+  are not dischargeable under this toolchain at all. The sign-off must say so
+  rather than counting the row.
+- **Partial SystemVerilog support.** Icarus ignores `unique`/`priority` case
+  qualities — it says so, which is how it was found — so the FIFO carries a
+  plain `case`.
+
+### Files-in-this-commit
+- docs/adr/ADR-0008-toolchain.md
