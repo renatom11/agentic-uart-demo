@@ -21,23 +21,78 @@ def sh(*a):
 
 
 GROUPS = [
-    ('enforce', 'the enforcement', ['scripts/', 'agents/PROTOCOL.md', '.github/']),
-    ('org', 'the organization', ['agents/charters/', 'ORG_CHART.md', 'CLAUDE.md',
-                                 'BOOTSTRAP.md', 'README.md', 'docs/SPONSOR.md',
-                                 'agents/handoffs/', 'docs/playbooks/', 'docs/gates/', 'tasks/']),
-    ('journals', 'the journals', ['agents/journals/']),
-    ('spec', 'the specification', ['docs/specs/']),
-    ('adr', 'the decisions', ['docs/adr/', 'docs/LESSONS.md']),
-    ('rtl', 'the design', ['rtl/']),
-    ('test', 'the benches', ['test/']),
+    ('shell', 'the framework', True, [
+        ('constitution', 'Constitution', ['agents/PROTOCOL.md'],
+         'The rules every seat reads before acting: the seats, the paths each may edit, how work moves, '
+         'and the thresholds at which a problem goes to the sponsor. Adopted whole with the shell rather '
+         'than written for this project.'),
+        ('enforcement', 'Enforcement scripts', ['scripts/'],
+         'The commit script and the checks that mechanically refuse a rule-breaking commit. On this program '
+         "they refused the orchestrator three times: a genesis commit carrying another repository's journal "
+         'history, a missing commit trailer, and an undeclared set of foreign journal seeds.'),
+        ('roster', 'Roster and charters', ['ORG_CHART.md', 'agents/charters/', 'CLAUDE.md', 'BOOTSTRAP.md',
+                                           'README.md', 'docs/SPONSOR.md', 'docs/playbooks/', 'docs/gates/', '.claude/'],
+         'One file per seat saying what it may write and what it is forbidden to write. Two seats the shell '
+         'ships with were dropped here: a UART wakes neither a market-data fetcher nor a SAT prover, and a '
+         'roster that overstates the organization is a roster that lies.'),
+        ('board', 'Program board', ['tasks/'],
+         'Live program state, including what this program has NOT done. It records the module-ready gate as '
+         'unsigned, and says why.'),
+    ]),
+    ('seats', 'the seats', True, [
+        ('journals', 'Journals', ['agents/journals/'],
+         'One append-only journal per seat. Every commit pairs work with a new entry, and the commit script '
+         'refuses work that arrives without one. Entries only accumulate: J-architect_docs_lead-0003 published '
+         'a wrong conclusion and is still there, unedited, with 0004 correcting it.'),
+    ]),
+    ('spec', 'specification', False, [
+        ('specdoc', 'The specification', ['docs/specs/SPEC-uart_lite.md', 'docs/specs/SPEC-TEMPLATE.md'],
+         'Written before any RTL existed. Five interface contracts, the divisor arithmetic with its derivations '
+         "shown, and the sample grid stated in clock cycles rather than in the design's own oversample ticks."),
+        ('reqs', 'Numbered requirements', ['docs/specs/requirements.md'],
+         'Each requirement carries a number and a stated verification method, so a bench cites exactly what it '
+         'discharges and a verdict traces back through it.'),
+    ]),
+    ('decisions', 'the decisions', False, [
+        ('adr', 'Decision records', ['docs/adr/', 'docs/LESSONS.md'],
+         'Each records the decision, the alternatives, and why each lost. ADR-0008 fixes the toolchain at '
+         'SystemVerilog and Icarus and writes down what that choice gives up: no synthesis at all, so REQ-017 '
+         'is not dischargeable under it.'),
+    ]),
+    ('product', 'the product', False, [
+        ('rtl', 'RTL source', ['rtl/'],
+         'Six SystemVerilog files, 249 lines. Graded only by benches the implementation line never wrote. '
+         'One of them carried BUG-0001.'),
+    ]),
+    ('trail', 'the paper trail', False, [
+        ('wo', 'Work orders', ['agents/handoffs/'],
+         'Work travels as versioned files, not as messages that vanish when a session ends. WO-0001 withheld '
+         'rtl/** from its assignee on purpose, and says so in its own text.'),
+    ]),
+    ('verification', 'verification', True, [
+        ('benches', 'Testbenches', ['test/'],
+         'Written from the specification by a session that could not read the design. The largest single check '
+         'sweeps sender bit periods 422 through 447 across all 256 byte values.'),
+    ]),
+    ('ci', 'continuous integration', False, [
+        ('ciw', 'CI workflows', ['.github/'],
+         'The same rule checks re-run on every push, plus a blocking simulation lane. Append-only cannot be '
+         'verified incrementally, so the journal check re-walks the whole history every time.'),
+    ]),
+    ('site', 'the site', False, [
+        ('sitebox', 'This website', ['site/'],
+         'Generated from the repository at build time and rebuilt by CI from a live suite run, so it cannot '
+         'state a number the program does not have.'),
+    ]),
 ]
 
 
 def group_of(path):
-    for key, _, prefixes in GROUPS:
-        if any(path.startswith(p) for p in prefixes):
-            return key
-    return 'org'
+    for key, _, _, boxes in GROUPS:
+        for _, _, prefixes, _ in boxes:
+            if any(path.startswith(p) for p in prefixes):
+                return key
+    return 'shell'
 
 
 def commits():
@@ -106,15 +161,69 @@ def suite(rerun):
     return benches
 
 
+PHASE = ['ADOPT', 'SPECIFY', 'BUILD', 'BUILD', 'BUILD', 'BUILD',
+         'VERIFY', 'VERIFY', 'VERIFY', 'VERIFY', 'VERIFY', 'GATE']
+
+SEATDESC = {
+    'orchestrator': 'The only agent that may spawn other agents, and the only one that commits — each '
+        "seat's work is committed under that seat's name. Its write scope covers every path, and it "
+        'authors none of the substance.',
+    'architect_docs_lead': 'Turns intent into the specification and its numbered requirements, and owns '
+        'the decision records. Nothing is built that it has not specified. Its own entry 0003 published a '
+        'wrong conclusion about where a defect lay; 0004 corrects it, and 0003 stays.',
+    'rtl_lead': 'Owns rtl/** — everything that ships. It does not write the tests that grade its own '
+        'output. BUG-0001 was its defect, found by a bench it never saw.',
+    'dv_lead': 'Owns test/** and the verdicts. It adjudicated the eight red checks: one design defect, '
+        'two bench defects, all three the same anchor ambiguity in three different artifacts.',
+    'tb_writer': 'A short-lived worker spawned for one packet. Its packet carried the specification and '
+        'deliberately withheld the RTL.',
+    'auditor': 'Audits every seat including the orchestrator that spawns it. Its write scope is its own '
+        'reports, so it cannot repair what it finds. Not yet spawned on this program — recorded as a '
+        'limitation rather than implied.',
+    'rtl_module_dev': 'Implementation worker template. Not spawned on this program: the design is six '
+        'files and the lead built it directly.',
+}
+
+STATICS = {
+    'sponsor': ['Sponsor', 'The single human. Sets scope, and holds two duties no agent can: enabling '
+        'branch protection, without which the append-only journal holds by convention plus CI rather '
+        'than by server rule, and it is NOT yet enabled here.'],
+    'sessions': ['Agent sessions', 'An agent runs as one session and does not persist beyond it. A '
+        'dashed slot is a seat with no session running. Only the bench worker ran as a genuinely '
+        'separate, blinded session on this program.'],
+    'repo': ['The repository', 'Every role, rule, task, decision and piece of evidence exists as a file '
+        'here, because no state survives between sessions.'],
+    'gate': ['The commit gate', 'scripts/agent_commit.sh is the sanctioned path to git commit. It checks '
+        'the staged change against the protocol and refuses a commit that breaks one. It refused the '
+        "orchestrator three times on this program — including the repository's own first commit."],
+    'ci': ['Continuous integration', 'The same rule checks re-run on every push, plus a blocking '
+        'simulation lane. The sim lane was red for four commits because it landed before the benches it '
+        'gates existed — the reasoning was right, the ordering was wrong.'],
+}
+
+
 def main():
     cs = commits()
     seen, steps = set(), []
+    jr = journals()
     for i, c in enumerate(cs):
         added = [f for f in c['files'] if f not in seen]
         seen.update(c['files'])
+        groups_touched = sorted({group_of(f) for f in c['files'] if not f.startswith('agents/journals/')})
+        entry = next((e for e in jr.get(c['agent'], []) if e['id'] == c['entry']), None)
+        acts = []
+        span = max(1, len(groups_touched))
+        for k, g in enumerate(groups_touched):
+            kind = 'blind' if c['agent'] == 'tb_writer' else 'write'
+            acts.append({'f': 'ag-' + c['agent'], 'to': 'g-' + g, 'kind': kind,
+                         's': round(0.12 + 0.55 * k / span, 3), 'e': round(0.55 + 0.4 * (k + 1) / span, 3)})
+        acts.append({'f': 'ag-' + c['agent'], 'to': 'g-seats', 'kind': 'write', 's': 0.5, 'e': 0.95})
         steps.append({'i': i, 'sha': c['sha'], 'agent': c['agent'], 'subject': c['subject'],
-                      'entry': c['entry'], 'wo': c['wo'],
-                      'added': [{'p': f, 'g': group_of(f)} for f in added]})
+                      'entry': c['entry'], 'wo': c['wo'], 'phase': PHASE[i] if i < len(PHASE) else 'GATE',
+                      'excerpt': (entry or {}).get('excerpt', ''),
+                      'acts': acts,
+                      'added': [{'p': f, 'g': group_of(f)} for f in added],
+                      'ci': '.github/workflows/sim.yml' in c['files']})
 
     src = {}
     for p in sh('git', 'ls-files', 'rtl', 'test', 'docs/specs').split():
@@ -123,16 +232,34 @@ def main():
             src[p] = open(full).read()
 
     benches = suite('--run' in sys.argv)
-    data = {'steps': steps, 'groups': [{'k': k, 'label': l} for k, l, _ in GROUPS],
-            'benches': benches, 'total': sum(b['total'] for b in benches),
-            'reqs': requirements(), 'journals': journals(), 'src': src, 'repo': REPO}
+    total = sum(b['total'] for b in benches)
+    reqs = requirements()
+    data = {'steps': steps,
+            'groups': [{'k': k, 'label': l, 'wide': w,
+                        'boxes': [{'k': bk, 'label': bl, 'match': bm, 'desc': bd,
+                                   'big': bk in ('rtl', 'benches')} for bk, bl, bm, bd in boxes]}
+                       for k, l, w, boxes in GROUPS],
+            'benches': benches, 'total': total, 'reqs': reqs, 'journals': jr, 'src': src,
+            'seatdesc': SEATDESC, 'statics': STATICS, 'repo': REPO,
+            'sub': f'This page follows one real FPGA project end to end: uart_lite, a 115200 baud 8N1 '
+                   f'serial port for a 50 MHz board, five modules, built by AI agents under one human '
+                   f'sponsor. {len(steps)} beats — and each beat is an actual commit in this repository, '
+                   f'with the files it really added and the seat named in its own trailer. Press play, '
+                   f'or drag the scrubber. Click any seat, group, box or file.',
+            'foot': f'Every figure on this page is read out of the repository at build time — the commit '
+                    f'list, the per-commit file sets, the requirement rows and the {total} check results '
+                    f'— and rebuilt by CI from a live suite run. <br><br><b>What this page does not '
+                    f'claim.</b> No mutation campaign has run, so nothing establishes in general that '
+                    f'these benches would catch a defect; one real find is not a detection rate. Nothing '
+                    f'has been synthesised. Only the testbench was written under genuine session-level '
+                    f'blinding. The module-ready gate is recorded <b>unsigned</b> for exactly these '
+                    f'reasons.'}
 
     os.makedirs(PUB, exist_ok=True)
     tpl = open(os.path.join(ROOT, 'site', 'lifecycle_src.html')).read()
     open(os.path.join(PUB, 'lifecycle.html'), 'w').write(
         tpl.replace('/*__DATA__*/{}', json.dumps(data, separators=(',', ':'))))
 
-    # ---- overview page, same data, nothing hand-typed --------------------
     bench_rows = ''.join(
         f'<tr><td class="mono">{b["name"]}</td><td class="num">{b["total"]}</td>'
         f'<td class="num"><span class="pill{" bad" if b["fail"] else ""}">'
@@ -141,11 +268,9 @@ def main():
         f'<tr><td class="mono sha"><a href="https://github.com/{REPO}/commit/{c["sha"]}">'
         f'{c["sha"]}</a></td><td class="mono seat">{c["agent"].replace("_", " ")}</td>'
         f'<td>{c["subject"]}</td></tr>' for c in cs)
-    idx = INDEX_TPL.format(
-        repo=REPO, total=data['total'], ncommits=len(steps), nreq=len(data['reqs']),
-        nfiles=len(seen), njournal=sum(len(v) for v in data['journals'].values()),
-        bench_rows=bench_rows, commit_rows=commit_rows)
-    open(os.path.join(PUB, 'index.html'), 'w').write(idx)
+    open(os.path.join(PUB, 'index.html'), 'w').write(INDEX_TPL.format(
+        repo=REPO, total=total, ncommits=len(steps), nreq=len(reqs), nfiles=len(seen),
+        njournal=sum(len(v) for v in jr.values()), bench_rows=bench_rows, commit_rows=commit_rows))
 
     print(f"site built · {len(steps)} commits · {len(seen)} files · "
           f"{data['total']} checks · {len(data['reqs'])} requirements · "

@@ -342,3 +342,42 @@ stands at the SHA it was built from, which is the property I wanted.
 
 ### Files-in-this-commit
 - .github/workflows/pages.yml
+
+---
+## [J-orchestrator-0007] 2026-08-13T03:20:00Z | task:none | The lifecycle page is rebuilt to the NIC program's treatment, with the twelve beats replaced by the fourteen real commits
+
+### Trigger
+Sponsor compared the demo's lifecycle page against the NIC program's and said it
+should be exactly like that one: the org tree with its reporting lines, the
+repository as artifact boxes with live counts, the gate and CI rails, phases on
+the scrubber, the legend, and the annotation rail.
+
+### Reasoning
+- **Rebuilt rather than copied.** The NIC page's source is not reachable from
+  this machine: its commits are absent from the checkout available here, no copy
+  survives on disk, and the deployed page cannot be fetched — the sandbox proxy
+  refuses both the site and the Pages API. So the treatment was rebuilt from the
+  design rather than ported. Recorded because "the same as the other one" is a
+  claim a later reader might check.
+- **The beats are the commits.** The NIC page animated a scripted story. This one
+  has no script: each beat is a real commit, its title is that commit's subject,
+  its annotation is the first sentences of the journal entry its author wrote,
+  its token flies from the seat named in the commit's own trailer to the groups
+  that commit actually touched, and the artifact counts are the files it really
+  added. There is nothing on the page to keep in sync with the program, because
+  the page is generated from it.
+- The blind seat is drawn differently on purpose — dashed, in the audit colour —
+  because it is the one seat whose separation this program actually enforced at
+  the session level, and the page should not flatter the rest.
+
+### A defect caught by running it rather than by reading it
+The first build produced a page that threw `Cannot read properties of undefined
+(reading 'forEach')` on every frame: the generator computed each beat's token
+list and then never put it in the beat. The page still rendered statically and
+every click target still worked, so a screenshot looked correct — only pressing
+play exposed it. The harness now asserts the scrubber advances after a play
+click, which is what caught it.
+
+### Files-in-this-commit
+- site/build.py
+- site/lifecycle_src.html
