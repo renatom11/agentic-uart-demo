@@ -311,3 +311,34 @@ builds and uploads the artifact but has nothing to deploy to.
 - .gitignore
 - site/build.py
 - site/lifecycle_src.html
+
+---
+## [J-orchestrator-0006] 2026-08-13T02:55:00Z | task:none | The pages job enables Pages itself, so publishing needs no click; the build step it failed after had already succeeded
+
+### Trigger
+The `pages` workflow failed on its first run at f7712ff. The build step it ran
+first did not fail: it printed "site built · 13 commits · 81 files · 609 checks ·
+17 requirements · 13 journal entries" after installing the simulator and running
+the suite. The failure was `actions/configure-pages@v5` reporting "Get Pages site
+failed. Please verify that the repository has Pages enabled".
+
+### Reasoning
+The action takes an `enablement` parameter that turns Pages on through the API
+using the `pages: write` permission the workflow already requests. Using it
+removes the one manual step between a push and a published site. The repository
+is already public, so this changes how its existing content is served rather
+than what is exposed.
+
+Recorded because the distinction matters when reading the run history: the first
+`pages` run is red, and it is red for a configuration reason after the work
+succeeded, not because the site failed to build. The `sim` and `journal-check`
+lanes were green on the same commit.
+
+### A detail worth noting about the numbers
+The CI build reports 13 commits and 13 journal entries where the local build
+reported 12 — because CI builds at the commit that adds the site, so the site
+includes the commit that created it. The page describes the repository as it
+stands at the SHA it was built from, which is the property I wanted.
+
+### Files-in-this-commit
+- .github/workflows/pages.yml

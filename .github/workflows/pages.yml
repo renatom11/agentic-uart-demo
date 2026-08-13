@@ -29,7 +29,10 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y iverilog
       - name: Build the site from a live suite run
         run: python3 site/build.py --run
+      # enablement: turn Pages on from here rather than requiring a click in
+      # the repository settings. Needs the pages:write permission granted above.
       - uses: actions/configure-pages@v5
+        with: { enablement: true }
       - uses: actions/upload-pages-artifact@v3
         with: { path: site/public }
 
