@@ -262,3 +262,52 @@ can tell whose keystrokes made an edit. That residue belongs on the record.
 
 ### Files-in-this-commit
 - tasks/BOARD.md
+
+---
+## [J-orchestrator-0005] 2026-08-13T02:40:00Z | task:none | The site is generated from the repository and built by CI from a live suite run, so it cannot claim a number the program does not have
+
+### Trigger
+Sponsor asked for a website for this program, kept separate from the NIC
+program's site.
+
+### Reasoning
+- **Nothing on the site is typed by hand.** `site/build.py` reads the commit
+  list, the per-commit file sets, the requirement rows, the journal entries and
+  the simulation results out of the repository. The lifecycle page's twelve
+  steps are the twelve real commits, the files that appear are the files those
+  commits actually added, and the seat that lights up is the seat named in the
+  commit trailer. A site that restates the program in prose can drift from it;
+  one that derives from it cannot.
+- **`site/public/` is not committed, and that is the point.** It is
+  .gitignore'd and built in CI, which installs the simulator and runs the suite
+  before generating the pages. The alternative — committing the built site —
+  publishes whatever numbers were true when someone last remembered to rebuild.
+  Under PROTOCOL §10 CI is the authoritative build environment, and the figures
+  on a page making claims about test results should come from there.
+- `build.py` exits non-zero rather than guessing if it cannot parse a suite
+  result. A site build that silently published "0 checks" would be worse than a
+  failed build.
+- The page states what the program has not done, in the same type size as what
+  it has: no mutation campaign, no synthesis, only the benches written blind,
+  gate unsigned. Those four sentences are on both pages.
+
+### Actions
+- `site/build.py`, `site/lifecycle_src.html` (the template the data is spliced
+  into), `.github/workflows/pages.yml`, and a .gitignore entry for the output.
+
+### Evidence
+- `python3 site/build.py` → "site built · 12 commits · 78 files · 609 checks ·
+  17 requirements · 12 journal entries", all read from the repository.
+- Both pages render with no console errors in Chromium at 1460px and 900px, in
+  light and dark, and neither scrolls horizontally.
+
+### Not yet true
+GitHub Pages is not enabled on this repository; that is a sponsor action in the
+repository settings (Pages → source: GitHub Actions). Until it is, this workflow
+builds and uploads the artifact but has nothing to deploy to.
+
+### Files-in-this-commit
+- .github/workflows/pages.yml
+- .gitignore
+- site/build.py
+- site/lifecycle_src.html

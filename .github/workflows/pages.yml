@@ -1,0 +1,44 @@
+name: pages
+
+# Publishes the site. The site is NOT committed: this job installs the
+# simulator, runs the suite, and builds the pages from the result, so every
+# figure published is produced by a real run in the authoritative environment
+# (PROTOCOL §10) rather than baked on someone's laptop and possibly stale.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }          # build.py reads the whole commit history
+      - name: Install Icarus Verilog (distribution archive only)
+        run: sudo apt-get update && sudo apt-get install -y iverilog
+      - name: Build the site from a live suite run
+        run: python3 site/build.py --run
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: site/public }
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

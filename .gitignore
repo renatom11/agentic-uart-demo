@@ -10,3 +10,8 @@ tools/data/
 # Simulation build products
 build/
 *.vcd
+
+site/.suite.log
+
+# The site is built by CI from a live suite run, never committed stale
+site/public/

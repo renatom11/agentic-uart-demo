@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>agentic-uart-demo — how it was built</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{
+  --bg:#f7f5f1; --panel:#fffefb; --ink:#191714; --ink2:#6b635a; --line:#ddd6cc;
+  --sig:#b45309; --ver:#4338ca; --ok:#15803d; --okbg:#e8f3ea; --bad:#b91c1c;
+  --chip:#f1ede6;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#141311; --panel:#1c1a17; --ink:#eeeae3; --ink2:#9c948a; --line:#332f2a;
+  --sig:#e8a33d; --ver:#9d92f5; --ok:#5cc98a; --okbg:#172b1f; --bad:#e8837b;
+  --chip:#232019;
+}}
+:root[data-theme=light]{--bg:#f7f5f1;--panel:#fffefb;--ink:#191714;--ink2:#6b635a;--line:#ddd6cc;--sig:#b45309;--ver:#4338ca;--ok:#15803d;--okbg:#e8f3ea;--bad:#b91c1c;--chip:#f1ede6}
+:root[data-theme=dark]{--bg:#141311;--panel:#1c1a17;--ink:#eeeae3;--ink2:#9c948a;--line:#332f2a;--sig:#e8a33d;--ver:#9d92f5;--ok:#5cc98a;--okbg:#172b1f;--bad:#e8837b;--chip:#232019}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:16px/1.6 Georgia,'Iowan Old Style','Times New Roman',serif}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.wrap{max-width:1460px;margin:0 auto;padding:0 1.3rem 4rem}
+a{color:var(--sig)}
+header.top{padding:2.2rem 0 1.2rem}
+.kicker{font:600 .68rem ui-monospace,monospace;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--sig);margin:0 0 .5rem}
+h1{font-size:clamp(1.7rem,3.6vw,2.6rem);line-height:1.1;margin:0 0 .5rem;letter-spacing:-.01em}
+.thesis{color:var(--ink2);max-width:72ch;margin:0 0 1.3rem;font-size:1.02rem}
+.stats{display:flex;flex-wrap:wrap;gap:.6rem;margin-bottom:.4rem}
+.stat{border:1px solid var(--line);border-radius:9px;background:var(--panel);
+  padding:.5rem .8rem .55rem;min-width:9rem}
+.stat b{display:block;font:700 1.35rem ui-monospace,monospace;letter-spacing:-.02em;line-height:1.1}
+.stat span{font:500 .64rem ui-monospace,monospace;letter-spacing:.09em;text-transform:uppercase;color:var(--ink2)}
+.stat.good b{color:var(--ok)}
+.app{display:grid;grid-template-columns:minmax(0,1fr) 350px;gap:1.1rem;align-items:start;margin-top:1.4rem}
+.stage{display:grid;grid-template-columns:212px minmax(0,1fr);gap:1rem;position:relative}
+#fx{position:absolute;inset:0;pointer-events:none;z-index:5;overflow:visible}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:.8rem .75rem}
+.btitle{font:600 .63rem ui-monospace,monospace;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--ink2);margin:0 0 .6rem}
+/* seats */
+.seat{display:block;width:100%;text-align:left;border:1px solid var(--line);border-radius:8px;
+  background:transparent;color:inherit;padding:.36rem .5rem;margin-bottom:.34rem;cursor:pointer;
+  font-family:inherit;transition:all .3s}
+.seat .nm{font:600 .8rem ui-monospace,monospace;display:block}
+.seat .rl{font:400 .62rem ui-monospace,monospace;color:var(--ink2);display:block;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.seat.act{border-color:var(--sig);background:color-mix(in srgb,var(--sig) 12%,var(--panel));
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--sig) 16%,transparent)}
+.seat.act .nm{color:var(--sig)}
+.seat.blind{border-style:dashed;border-color:var(--ver)}
+.seat.blind .nm{color:var(--ver)}
+.seat b.jc{color:var(--sig);font-family:ui-monospace,monospace;font-size:.7rem}
+/* repo */
+.repo{position:relative}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:.6rem}
+.grp{border:1px solid var(--line);border-radius:10px;padding:.7rem .5rem .45rem;position:relative;
+  background:var(--bg);transition:opacity .35s}
+.grp.off{opacity:.28}
+.grp>.gl{position:absolute;top:-.52rem;left:.5rem;background:var(--panel);padding:0 .3rem;
+  font:600 .56rem ui-monospace,monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);
+  border:0;cursor:pointer}
+.grp>.gl:hover{color:var(--sig)}
+.fl{max-height:9.6rem;overflow-y:auto;scrollbar-width:thin}
+.grp .n{color:var(--sig);font-weight:700}
+.f{display:block;width:100%;text-align:left;border:0;background:transparent;color:inherit;
+  font:500 .68rem ui-monospace,monospace;padding:.1rem .22rem;border-radius:4px;cursor:pointer;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:opacity .35s,background .2s}
+.f:hover{background:var(--chip)}
+.f.hid{display:none}
+.f.new{background:color-mix(in srgb,var(--sig) 22%,transparent);animation:pop .7s ease-out}
+@keyframes pop{from{background:color-mix(in srgb,var(--sig) 55%,transparent)}}
+.more{font:500 .62rem ui-monospace,monospace;color:var(--ink2);padding:.1rem .22rem}
+/* rail */
+.rail{display:flex;flex-direction:column;gap:.8rem;position:sticky;top:.8rem}
+.anno{border:1px solid var(--sig);border-radius:12px;background:var(--panel);padding:.75rem .85rem .85rem}
+.anno .step{font:600 .6rem ui-monospace,monospace;letter-spacing:.1em;color:var(--sig);
+  text-transform:uppercase;display:flex;justify-content:space-between}
+.anno h3{font-size:1rem;line-height:1.35;margin:.3rem 0 .4rem}
+.anno .by{font:500 .66rem ui-monospace,monospace;color:var(--ink2);margin-bottom:.4rem}
+.anno .je{font-size:.84rem;color:var(--ink2);border-top:1px solid var(--line);padding-top:.45rem;margin-top:.45rem}
+.det{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:.75rem .85rem .85rem}
+.det h4{margin:0 0 .35rem;font-size:.92rem}
+.det .hint{font:500 .6rem ui-monospace,monospace;letter-spacing:.07em;text-transform:uppercase;color:var(--ink2)}
+.det pre{background:var(--chip);border-radius:7px;padding:.55rem .6rem;overflow-x:auto;
+  font:500 .68rem/1.5 ui-monospace,monospace;max-height:min(52vh,560px);margin:.4rem 0 0;
+  white-space:pre;color:var(--ink)}
+.det .body{font-size:.85rem;color:var(--ink2);max-height:min(52vh,560px);overflow-y:auto}
+.row{padding:.32rem 0;border-bottom:1px dotted var(--line);font-size:.8rem}
+.row:last-child{border-bottom:0}
+.row .id{font:700 .68rem ui-monospace,monospace;color:var(--sig)}
+.row .m{font:500 .6rem ui-monospace,monospace;color:var(--ink2)}
+.pill{font:700 .56rem ui-monospace,monospace;letter-spacing:.06em;padding:.03rem .32rem;border-radius:4px;
+  border:1px solid var(--ok);color:var(--ok);background:var(--okbg);white-space:nowrap}
+.pill.bad{border-color:var(--bad);color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,var(--panel))}
+.pill.v{border-color:var(--ver);color:var(--ver);background:color-mix(in srgb,var(--ver) 12%,var(--panel))}
+/* transport */
+.tp{margin-top:1rem;border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:.7rem .9rem .8rem}
+.tr{display:flex;align-items:center;gap:.7rem}
+.bt{border:1.5px solid var(--sig);color:var(--sig);background:transparent;border-radius:8px;
+  font:700 .74rem ui-monospace,monospace;padding:.3rem .7rem;cursor:pointer;min-width:5.2rem}
+.bt:hover{background:color-mix(in srgb,var(--sig) 12%,transparent)}
+#scrub{flex:1;accent-color:var(--sig);cursor:pointer;min-width:0}
+.ticks{display:flex;gap:2px;margin-top:.5rem}
+.tick{flex:1;height:5px;border-radius:2px;background:var(--line);cursor:pointer;transition:background .25s}
+.tick.done{background:color-mix(in srgb,var(--sig) 55%,var(--line))}
+.tick.cur{background:var(--sig)}
+.foot{border-top:1px solid var(--line);margin-top:2rem;padding-top:.9rem;color:var(--ink2);
+  font-size:.86rem;max-width:90ch}
+.callout{border-left:3px solid var(--sig);padding:.5rem 0 .5rem .7rem;margin:.6rem 0;font-size:.85rem}
+@media(max-width:1160px){.app{grid-template-columns:1fr}.rail{position:static}}
+@media(max-width:820px){.stage{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <p class="kicker">agentic-uart-demo · lifecycle</p>
+  <h1>An AI organization built this UART, and its own testbench caught it lying.</h1>
+  <p class="thesis">Every step below is a real commit in a real repository. The design is
+  <span class="mono">uart_lite</span>, a 115200&nbsp;baud 8N1 serial port for a 50&nbsp;MHz FPGA.
+  The specification came before the RTL; the testbench was written by a separate session that was
+  forbidden to read the RTL; and on its first run it found a one-line defect nobody had planted.
+  Press play, or drag through the twelve commits.</p>
+  <div class="stats" id="stats"></div>
+</header>
+
+<div class="app">
+  <div>
+    <div class="stage" id="stage">
+      <svg id="fx"></svg>
+      <div class="box">
+        <p class="btitle">the seats</p>
+        <div id="seats"></div>
+      </div>
+      <div class="box repo">
+        <p class="btitle">the repository <span class="mono" id="fcount" style="color:var(--sig)"></span></p>
+        <div class="grid" id="grid"></div>
+      </div>
+    </div>
+    <div class="tp">
+      <div class="tr">
+        <button class="bt" id="play">&#9654; PLAY</button>
+        <input type="range" id="scrub" min="0" max="11" step="1" value="0" aria-label="commit timeline">
+        <span class="mono" style="font-size:.68rem;color:var(--ink2);min-width:5.2rem" id="clock"></span>
+      </div>
+      <div class="ticks" id="ticks"></div>
+    </div>
+  </div>
+  <div class="rail">
+    <div class="anno">
+      <div class="step"><span id="stepn"></span><span id="stepsha" class="mono"></span></div>
+      <h3 id="stept"></h3>
+      <div class="by" id="stepby"></div>
+      <div class="je" id="stepje"></div>
+    </div>
+    <div class="det" id="det">
+      <span class="hint" id="dhint">click any seat, group or file</span>
+      <h4 id="dett"></h4>
+      <div id="detb"></div>
+    </div>
+  </div>
+</div>
+
+<div class="foot" id="foot"></div>
+</div>
+
+<script>
+const D = /*__DATA__*/{};
+const $ = i => document.getElementById(i);
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+const SEATS = [
+  ['orchestrator','sole spawner · sole committer'],
+  ['architect_docs_lead','specs · requirements · ADRs'],
+  ['rtl_lead','rtl/** — the design'],
+  ['dv_lead','test/** — verdicts'],
+  ['tb_writer','benches · RTL withheld'],
+  ['auditor','its own reports only'],
+  ['rtl_module_dev','worker'],
+];
+const BLIND = new Set(['tb_writer']);
+
+/* every file, and the step at which it first appeared */
+const BORN = {};
+D.steps.forEach(s => s.added.forEach(a => { if (BORN[a.p] === undefined) BORN[a.p] = { i: s.i, g: a.g }; }));
+const GROUPED = {};
+for (const p in BORN) (GROUPED[BORN[p].g] ??= []).push(p);
+for (const g in GROUPED) GROUPED[g].sort((a,b) => BORN[a].i - BORN[b].i || a.localeCompare(b));
+
+let T = 0, playing = false, timer = null, open = null;
+
+/* ---------- build the static DOM once ---------- */
+$('stats').innerHTML = [
+  ['good', D.total, 'checks passing'],
+  ['', D.steps.length, 'commits, all gated'],
+  ['', D.reqs.length, 'numbered requirements'],
+  ['', Object.values(D.journals).reduce((n,v)=>n+v.length,0), 'journal entries'],
+  ['good', '1', 'real defect found blind'],
+].map(([c,b,s]) => `<div class="stat ${c}"><b>${b}</b><span>${s}</span></div>`).join('');
+
+$('seats').innerHTML = SEATS.map(([k, r]) =>
+  `<button class="seat${BLIND.has(k)?' blind':''}" data-seat="${k}">
+     <span class="nm">${k.replace(/_/g,' ')}</span><span class="rl">${r}</span></button>`).join('');
+
+$('grid').innerHTML = D.groups.map(g => {
+  const files = GROUPED[g.k] || [];
+  return `<div class="grp" id="g-${g.k}">
+    <button class="gl" data-grp="${g.k}">${g.label} <span class="n" id="n-${g.k}"></span></button>
+    <div class="fl" id="fl-${g.k}">${files.map(p =>
+      `<button class="f" data-file="${esc(p)}" id="f-${btoa(p).replace(/=/g,'')}">${esc(p)}</button>`).join('')}</div>
+  </div>`;
+}).join('');
+
+$('ticks').innerHTML = D.steps.map((s,i) => `<div class="tick" data-i="${i}" title="${esc(s.sha)}"></div>`).join('');
+$('scrub').max = D.steps.length - 1;
+
+$('foot').innerHTML = `Every number on this page is read out of the repository at build time —
+  the commit list, the file sets, the requirement rows and the check counts all come from
+  <a href="https://github.com/${D.repo}">${D.repo}</a> and none of it is typed by hand.
+  <div class="callout"><b>What this page does not claim.</b> No mutation campaign has been run,
+  so nothing establishes in general that these benches would catch a defect — one real find is not
+  a detection rate. Nothing has been synthesised; Icarus simulates only, so every area and timing
+  claim is unverified. And only the testbench was written under genuine session-level blinding:
+  the specification, the RTL and the orchestration were authored in one session under separate
+  seat identities. The module-ready gate is recorded <b>unsigned</b> for exactly these reasons.</div>`;
+
+/* ---------- render ---------- */
+function render() {
+  const s = D.steps[T];
+  document.querySelectorAll('.seat').forEach(el => {
+    const k = el.dataset.seat;
+    el.classList.toggle('act', k === s.agent);
+    const n = (D.journals[k] || []).filter((_, i) => i < countEntries(k, T)).length;
+    el.querySelector('.rl').innerHTML = SEATS.find(x => x[0] === k)[1] +
+      (n ? ` <b class="jc">· ${n}</b>` : '');
+  });
+  let shown = 0;
+  for (const g of D.groups) {
+    const files = GROUPED[g.k] || [];
+    let c = 0;
+    for (const p of files) {
+      const el = $('f-' + btoa(p).replace(/=/g, ''));
+      const on = BORN[p].i <= T;
+      el.classList.toggle('hid', !on);
+      el.classList.toggle('new', BORN[p].i === T);
+      if (on) c++;
+    }
+    shown += c;
+    $('n-' + g.k).textContent = c ? '×' + c : '';
+    $('g-' + g.k).classList.toggle('off', c === 0);
+  }
+  $('fcount').textContent = shown + ' files';
+  $('stepn').textContent = `commit ${T + 1} of ${D.steps.length}`;
+  $('stepsha').textContent = s.sha;
+  $('stept').textContent = s.subject;
+  $('stepby').textContent = s.agent.replace(/_/g, ' ') + ' · ' + s.entry +
+    (s.wo && s.wo !== 'none' ? ' · ' + s.wo : '');
+  const je = (D.journals[s.agent] || []).find(e => e.id === s.entry);
+  // the entry title repeats the commit subject by design; the excerpt is the new information
+  $('stepje').textContent = je ? (je.excerpt || je.title) : '';
+  $('clock').textContent = s.sha;
+  $('scrub').value = T;
+  document.querySelectorAll('.tick').forEach((t, i) => {
+    t.classList.toggle('done', i < T); t.classList.toggle('cur', i === T);
+  });
+  if (open) paint();
+}
+function countEntries(agent, t) {
+  return D.steps.filter((s, i) => i <= t && s.agent === agent).length;
+}
+
+/* ---------- detail card ---------- */
+function paint() {
+  const o = open; if (!o) return;
+  let title = '', body = '', hint = 'live — scrub and watch it fill';
+  if (o.kind === 'seat') {
+    const k = o.id, n = countEntries(k, T);
+    const entries = (D.journals[k] || []).slice(0, n);
+    title = k.replace(/_/g, ' ');
+    body = `<div class="body">${k === 'tb_writer'
+      ? `<p><b>This is the blind seat.</b> Its work order carried the specification and the
+         numbered requirements and deliberately withheld <span class="mono">rtl/**</span>. It wrote
+         ${D.total} checks from the specification alone, and eight of them came back red against the
+         design. It did not adjust them.</p>`
+      : ''}<p>${n ? `${n} commit${n>1?'s':''} so far, each paired with a journal entry:` : 'This seat has committed nothing yet at this point.'}</p>
+      ${entries.map((e, i) => `<div class="row"><span class="id">#${i+1}</span> ${esc(e.title)}</div>`).join('')}</div>`;
+  } else if (o.kind === 'grp') {
+    const g = D.groups.find(x => x.k === o.id);
+    const files = (GROUPED[o.id] || []).filter(p => BORN[p].i <= T);
+    title = g.label;
+    if (o.id === 'spec') {
+      body = `<div class="body"><p>${D.reqs.length} numbered requirements, each with a stated
+        verification method. A bench cites the number; a verdict traces back through it.</p>
+        ${D.reqs.map(r => `<div class="row"><span class="id">${r.id}</span> ${esc(r.title)}
+          <span class="m">${esc(r.method)}</span></div>`).join('')}</div>`;
+    } else if (o.id === 'test') {
+      body = `<div class="body"><p>Five benches, ${D.total} checks, written from the specification
+        by a session that could not read the design.</p>
+        ${D.benches.map(b => `<div class="row"><span class="id">${b.name}</span>
+          <span class="pill${b.fail?' bad':''}">${b.pass}/${b.total}</span></div>`).join('')}
+        ${files.map(p => `<div class="row mono" style="font-size:.7rem">${esc(p)}</div>`).join('')}</div>`;
+    } else {
+      body = `<div class="body"><p>${files.length} file${files.length===1?'':'s'} at this point.</p>
+        ${files.map(p => `<div class="row mono" style="font-size:.72rem">${esc(p)}</div>`).join('')}</div>`;
+    }
+  } else if (o.kind === 'file') {
+    title = o.id;
+    const txt = D.src[o.id];
+    hint = BORN[o.id].i <= T ? `added at ${D.steps[BORN[o.id].i].sha}` : 'not committed yet at this point';
+    body = txt ? `<pre>${esc(txt.length > 14000 ? txt.slice(0, 14000) + '\n…' : txt)}</pre>`
+               : `<div class="body"><p class="mono" style="font-size:.75rem">${esc(o.id)}</p>
+                  <p>Committed at ${D.steps[BORN[o.id].i].sha} by
+                  ${D.steps[BORN[o.id].i].agent.replace(/_/g,' ')}.</p></div>`;
+  }
+  $('dett').textContent = title; $('detb').innerHTML = body; $('dhint').textContent = hint;
+}
+
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-seat],[data-grp],[data-file]');
+  if (!el) return;
+  open = el.dataset.seat ? { kind:'seat', id:el.dataset.seat }
+       : el.dataset.grp  ? { kind:'grp',  id:el.dataset.grp }
+       :                   { kind:'file', id:el.dataset.file };
+  paint();
+});
+$('scrub').addEventListener('input', e => { T = +e.target.value; render(); });
+document.querySelectorAll('.tick').forEach(t =>
+  t.addEventListener('click', () => { stop(); T = +t.dataset.i; render(); }));
+function stop(){ playing = false; clearInterval(timer); $('play').innerHTML = '&#9654; PLAY'; }
+$('play').addEventListener('click', () => {
+  if (playing) return stop();
+  if (T >= D.steps.length - 1) T = -1;
+  playing = true; $('play').innerHTML = '&#10074;&#10074; PAUSE';
+  timer = setInterval(() => {
+    if (T >= D.steps.length - 1) return stop();
+    T++; render();
+  }, 2000);
+  T++; render();
+});
+render();
+</script>
+</body></html>
