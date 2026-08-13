@@ -381,3 +381,38 @@ click, which is what caught it.
 ### Files-in-this-commit
 - site/build.py
 - site/lifecycle_src.html
+
+---
+## [J-orchestrator-0008] 2026-08-13T03:45:00Z | task:none | A box counted its files where the sponsor expected its contents, and the overview page had no tab bar
+
+### Trigger
+Sponsor, reading the published site: the requirements box says ×1, and reaching
+the lifecycle page needs a link click rather than a tab.
+
+### Two defects, both mine
+1. **The counts said files, not contents.** Every artifact box counted the files
+   matching its path prefix. That reads correctly for most of them — RTL source
+   ×7 is seven files, journals ×8 is eight journals — but the requirements box
+   showed ×1, because seventeen numbered requirements live in one file. The
+   number was true and useless: nobody looking at that box wants to know how
+   many files hold the requirements.
+   A box may now declare something more meaningful to count than its files. Only
+   the requirements box does, and it now reads ×17. The birth of the box still
+   keys off the file, so it appears when the file is committed and not before.
+2. **Only the lifecycle page had the tab bar.** The overview carried a single
+   call-to-action link into the lifecycle page and no navigation back, so the two
+   pages were not peers — one was a landing page and the other was somewhere you
+   clicked through to. Both now carry the same bar with the current page marked.
+
+### Note
+The published site is live at renatom11.github.io/agentic-uart-demo — the Pages
+deployment that the previous entry recorded as not yet configured has since
+completed. I cannot load it from here to confirm the fix in place: this
+environment's proxy refuses both github.io and the Pages API. The sponsor is
+reading the deployed page and I am reading the built one, which is the same
+artifact by construction but not by observation, and that difference is worth
+stating rather than glossing.
+
+### Files-in-this-commit
+- site/build.py
+- site/lifecycle_src.html

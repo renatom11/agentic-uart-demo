@@ -428,8 +428,11 @@ function render(){
     const el=$('g-'+g.k); if(el) el.classList.toggle('unborn', files.length===0);
     for(const bx of (g.boxes||[])){
       const e=$('rb-'+bx.k); if(!e) continue;
-      const n=files.filter(p=>(bx.match||[]).some(m=>p.startsWith(m))).length;
-      e.classList.toggle('unborn', n===0);
+      const nf=files.filter(p=>(bx.match||[]).some(m=>p.startsWith(m))).length;
+      // a box counts its files unless it declares something more meaningful to
+      // count: one requirements FILE holds seventeen numbered requirements
+      const n = nf && bx.nkey ? (D[bx.nkey]||[]).length : nf;
+      e.classList.toggle('unborn', nf===0);
       let tag=e.querySelector('b.cnt');
       if(n){ if(!tag){tag=document.createElement('b');tag.className='cnt';e.appendChild(tag);} tag.textContent=' ×'+n; }
       else if(tag) tag.remove();

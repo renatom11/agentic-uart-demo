@@ -49,7 +49,7 @@ GROUPS = [
         ('specdoc', 'The specification', ['docs/specs/SPEC-uart_lite.md', 'docs/specs/SPEC-TEMPLATE.md'],
          'Written before any RTL existed. Five interface contracts, the divisor arithmetic with its derivations '
          "shown, and the sample grid stated in clock cycles rather than in the design's own oversample ticks."),
-        ('reqs', 'Numbered requirements', ['docs/specs/requirements.md'],
+        ('reqs@reqs', 'Numbered requirements', ['docs/specs/requirements.md'],
          'Each requirement carries a number and a stated verification method, so a bench cites exactly what it '
          'discharges and a verdict traces back through it.'),
     ]),
@@ -236,8 +236,10 @@ def main():
     reqs = requirements()
     data = {'steps': steps,
             'groups': [{'k': k, 'label': l, 'wide': w,
-                        'boxes': [{'k': bk, 'label': bl, 'match': bm, 'desc': bd,
-                                   'big': bk in ('rtl', 'benches')} for bk, bl, bm, bd in boxes]}
+                        'boxes': [{'k': bk.split('@')[0], 'label': bl, 'match': bm, 'desc': bd,
+                                   'nkey': (bk.split('@')[1] if '@' in bk else None),
+                                   'big': bk.split('@')[0] in ('rtl', 'benches')}
+                                  for bk, bl, bm, bd in boxes]}
                        for k, l, w, boxes in GROUPS],
             'benches': benches, 'total': total, 'reqs': reqs, 'journals': jr, 'src': src,
             'seatdesc': SEATDESC, 'statics': STATICS, 'repo': REPO,
@@ -296,7 +298,13 @@ body{{margin:0;background:var(--bg);color:var(--ink);
 .wrap{{max-width:820px;margin:0 auto;padding:0 1.3rem 5rem}}
 a{{color:var(--sig)}}
 .kicker{{font:600 .68rem ui-monospace,monospace;letter-spacing:.18em;text-transform:uppercase;
- color:var(--sig);margin:2.6rem 0 .5rem}}
+ color:var(--sig);margin:1.6rem 0 .5rem}}
+.tabs{{display:flex;flex-wrap:wrap;gap:.4rem;padding:1.4rem 0 .2rem}}
+.tab{{border:1.5px solid var(--line);border-radius:999px;background:var(--panel);color:var(--ink2);
+ padding:.32rem .85rem;font:600 .68rem ui-monospace,monospace;letter-spacing:.08em;
+ text-transform:uppercase;text-decoration:none;white-space:nowrap}}
+.tab:hover{{border-color:var(--sig);color:var(--sig)}}
+.tab.on{{background:var(--sig);border-color:var(--sig);color:#fff}}
 h1{{font-size:clamp(1.9rem,4.4vw,2.9rem);line-height:1.08;margin:0 0 .6rem;letter-spacing:-.015em}}
 h2{{font-size:1.25rem;margin:2.4rem 0 .5rem;letter-spacing:-.01em}}
 .lede{{font-size:1.1rem;color:var(--ink2);margin:0 0 1.5rem}}
@@ -326,6 +334,11 @@ code{{font-family:ui-monospace,monospace;font-size:.86em;background:var(--chip);
 .foot{{border-top:1px solid var(--line);margin-top:3rem;padding-top:1rem;color:var(--ink2);
  font-size:.85rem}}
 </style></head><body><div class="wrap">
+<nav class="tabs">
+  <a class="tab on" href="index.html">OVERVIEW</a>
+  <a class="tab" href="lifecycle.html">LIFECYCLE</a>
+  <a class="tab" href="https://github.com/{repo}">GITHUB &#8599;</a>
+</nav>
 <p class="kicker">{repo}</p>
 <h1>A working FPGA design, built and verified by an AI organization that has to show its work.</h1>
 <p class="lede">This repository is a proof of concept for a development framework, not for a UART.
