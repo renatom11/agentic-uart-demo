@@ -60,9 +60,17 @@ with a **synchronous, active-high** reset `rst`.
 | `restart` | in | 1 | when high, the counter is forced to 0 for that cycle and `tick` is suppressed |
 | `tick` | out | 1 | registered; high for exactly one cycle every `N` cycles |
 
-Counting the cycle after reset release (or after a `restart` pulse) as cycle 0,
-the k-th `tick` is high during cycle **N·k**. `tick` is never high in two
-consecutive cycles. `N` must be at least 2.
+**Anchor.** Cycle 0 is the cycle in which `rst` or `restart` is *sampled high*
+— not the cycle after it. Counting from there, the k-th `tick` is high during
+cycle **N·k**. `tick` is never high in two consecutive cycles. `N` must be at
+least 2.
+
+The anchor is stated this precisely because it is the one thing here that can be
+wrong by one cycle without any interval-based check noticing: the spacing
+between ticks is N under either convention, and only a measurement taken **from
+the restart to the first tick** can tell them apart. Getting it wrong by one
+makes the first transmit bit interval 435 cycles instead of 434 while every
+later interval stays correct.
 
 ### 5.2 `uart_tx`
 

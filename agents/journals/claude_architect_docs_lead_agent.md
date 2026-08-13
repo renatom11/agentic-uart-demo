@@ -102,3 +102,56 @@ simulation lane can land.
 
 ### Files-in-this-commit
 - docs/adr/ADR-0008-toolchain.md
+
+---
+## [J-architect_docs_lead-0003] 2026-08-13T01:20:00Z | task:none | The blind bench found the specification wrong, not the design: §5.1's anchor was off by one cycle, and REQ-002 could be discharged by a transmitter with a wrong first bit
+
+### Trigger
+tb_writer returned WO-0001 with 8 of 609 checks failing, all REQ-005, all in
+`uart_tick_gen`, reproducible across N = 2, 3, 27 and 434 and across both the
+reset and restart paths. The finding was left red rather than adjusted to pass,
+as the packet required.
+
+### Investigation, before deciding whose fault it was
+The orchestrator instrumented the design directly rather than accepting either
+side's account. Measuring the transmitter — the only consumer whose requirement
+fixes an absolute number — over nine low bit intervals of an all-zero byte:
+
+| tick_gen reload value | 9 bit intervals span | 9 x 434 |
+|---|---|---|
+| 1 (as implemented) | **3906 cycles** | 3906 |
+| 0 (the "fix" tried first) | 3907 cycles | 3906 |
+
+The implemented design is exactly right and the attempted correction was wrong;
+it added one cycle to the start bit and nothing else. That measurement decides
+the question: **the RTL is correct and neither of the two defects here is in it.**
+
+### Defect 1 — this specification, §5.1
+§5.1 said "counting the cycle after reset release (or after a `restart` pulse)
+as cycle 0, the k-th tick is high during cycle N·k". Measured, the design's
+first tick lands at cycle N-1 under that anchor and at cycle N when cycle 0 is
+the cycle in which `restart` is *sampled high*. The design is right; the
+sentence was off by one. Amended to state the anchor as the sampled-high cycle,
+with a note explaining why the anchor is worth a paragraph: the spacing between
+ticks is N under either convention, so only a measurement taken from the restart
+to the FIRST tick can tell them apart, and getting it wrong makes the first
+transmit bit interval 435 cycles while every later one stays correct.
+
+### Defect 2 — REQ-002 was dischargeable by a wrong transmitter
+Found while investigating the first. REQ-002 said each of the ten bit intervals
+shall be 434 cycles, "measured as the cycle count between successive `tx_line`
+value-decision points". A check written to that wording measures only the
+spacing between boundaries — and passes a transmitter whose first interval is
+435. That is exactly the defect the reload-0 variant introduces, and the bench,
+faithfully implementing the row as written, passed it 265/265. Amended to
+require the first interval measured from acceptance, and to say in the row
+itself that a spacing-only check does not discharge it.
+
+### What this round is evidence of
+A bench written from the specification by a session that could not read the
+design found an error in the specification. That is the blinding regime doing
+the thing it exists to do, on the first module, without anyone planning it.
+
+### Files-in-this-commit
+- docs/specs/SPEC-uart_lite.md
+- docs/specs/requirements.md
