@@ -1,9 +1,15 @@
 // uart_tick_gen — divide-by-N strobe with a restart input (SPEC §5.1).
 //
 // If `restart` is high during cycle L, `tick` is high during cycles L+N,
-// L+2N, ... The counter comparison is against N-1, and the counter reloads
-// to 1 (not 0) on restart, which is what puts the first tick exactly N
-// cycles after the restart rather than N-1.
+// L+2N, ...
+//
+// The reload value is 0. Reloading to 1 looks right on paper — "the counter
+// starts at one" — but the reload cycle is itself consumed, so the first tick
+// lands one cycle early and every later tick is correct. That is what makes
+// this defect hard to see: the SPACING between ticks is N under either value,
+// so the only check that can tell them apart measures from the restart to the
+// FIRST tick. In the transmitter it showed up as a start bit of 433 cycles
+// with all nine following intervals at 434.
 module uart_tick_gen #(
   parameter int N = 27
 ) (
@@ -17,7 +23,7 @@ module uart_tick_gen #(
 
   always_ff @(posedge clk) begin
     if (rst || restart) begin
-      cnt  <= CW'(1);
+      cnt  <= '0;
       tick <= 1'b0;
     end else if (cnt == CW'(N - 1)) begin
       cnt  <= '0;

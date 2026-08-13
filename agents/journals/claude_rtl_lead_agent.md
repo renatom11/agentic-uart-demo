@@ -69,3 +69,54 @@ written from the specification by a seat that cannot read these files.
 - rtl/uart_rx.sv
 - rtl/uart_tick_gen.sv
 - rtl/uart_tx.sv
+
+---
+## [J-rtl_lead-0002] 2026-08-13T01:45:00Z | task:none | BUG-0001: the tick generator reloaded to 1 instead of 0, making the start bit 433 cycles while every following interval was 434
+
+### Trigger
+tb_writer returned WO-0001 with 8 of 609 checks failing, all REQ-005, all in
+uart_tick_gen, reproducible across N = 2, 3, 27 and 434 and across both the
+reset and the restart path. The bench left them red rather than adjusting the
+expected values, as its packet required.
+
+### The defect
+`uart_tick_gen` reloaded its counter to 1 on `rst || restart`. The reload cycle
+is itself consumed by the counter, so the first tick landed one cycle early;
+every subsequent tick was correct. One line:
+
+    if (rst || restart) begin cnt <= CW'(1);   // wrong
+    if (rst || restart) begin cnt <= '0;       // right
+
+### Why it survived until a bench measured it
+The **spacing** between ticks is exactly N under both reload values. Only a
+measurement taken from the restart to the FIRST tick can separate them, and no
+interval-based check can. Measured on the transmitter with byte 0x01, so that
+d0 = 1 forces a real transition at the start/d0 boundary:
+
+| reload | start bit | d0 | d1 |
+|---|---|---|---|
+| 1 (defective) | **433 cycles** | 434 | 434 |
+| 0 (fixed) | **434 cycles** | 434 | 434 |
+
+An all-zero byte cannot see this at all: with start and d0 both low there is no
+transition at the boundary, and the total low span is the SUM of the intervals,
+which the defect leaves unchanged in aggregate. My first attempt to measure this
+used 0x00 and concluded the design was correct. It was not.
+
+### A wrong turn, recorded because the record is the point
+On the first pass I changed the reload to 0, saw the transmitter bench go red,
+and reverted it — concluding the RTL was right and the specification was wrong.
+That conclusion was wrong and I published it in J-architect_docs_lead-0003. The
+transmitter bench went red for an unrelated reason (its boundary grid was
+anchored on the acceptance cycle, which a registered output cannot satisfy), and
+I read a second defect's symptom as evidence about the first. What settled it
+was measuring the start bit directly rather than reasoning about it.
+
+### Evidence
+- `iverilog -g2012 -Wall -f rtl/uart_lite.f` — elaborates clean.
+- Start-bit width measured directly at 434 cycles; d0 and d1 at 434.
+- Full suite after the fix: **609 checks, 609 pass, 0 fail**, exit 0.
+- tb_uart_tick_gen alone: 28/28, where it was 20/28 before.
+
+### Files-in-this-commit
+- rtl/uart_tick_gen.sv
