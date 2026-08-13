@@ -123,14 +123,22 @@ module tb_uart_tick_gen;
         int consecutive_errors;
         n = n_value(gi);
 
-        // ---- Reset-anchored pattern: cycle 0 = the cycle after reset release.
+        // ---- Reset-anchored pattern.
+        // SPEC 5.1 anchor (amended at 21b8b2d after this bench found the
+        // original wording off by one): cycle 0 is the cycle in which rst is
+        // SAMPLED HIGH, not the cycle after it. observe_tick_pattern() labels
+        // its first observed posedge 0, and that posedge is the one AFTER the
+        // anchor, so an observation of c is spec-cycle c+1. The conversion is
+        // written out rather than folded into the expected value, so the
+        // anchor stays visible to a reader.
         rst_i = 1'b1;
         restart_i = 1'b0;
         repeat (3) @(negedge clk);
-        rst_i = 1'b0; // dropped between edges; the next posedge is cycle 0's edge
+        rst_i = 1'b0; // dropped between edges; the last posedge with rst high was the anchor
 
         span = 5 * n;
         observe_tick_pattern(n, span, first_tick, spacing_errors, consecutive_errors);
+        first_tick = first_tick + 1;   // observation cycles -> spec cycles
 
         check(first_tick == n, "REQ-005",
               $sformatf("N=%0d: first tick after reset lands at cycle N=%0d (k=1 in \"k-th tick at cycle N.k\"); observed first tick at cycle %0d",
@@ -142,10 +150,9 @@ module tb_uart_tick_gen;
               $sformatf("N=%0d: tick never high on two consecutive cycles, checked over %0d post-reset cycles (%0d violations)",
                          n, span, consecutive_errors));
 
-        // ---- Restart-anchored pattern: cycle 0 = the cycle after the
-        // restart pulse cycle (symmetric with the reset case, per REQ-005's
-        // own wording). Tick must be suppressed during the pulse cycle
-        // itself, per SS5.1's port table.
+        // ---- Restart-anchored pattern: cycle 0 = the cycle in which restart
+        // is SAMPLED HIGH (SPEC 5.1 as amended). Tick must be suppressed
+        // during the anchor cycle itself, per SS5.1's port table.
         repeat (2 * n + (n / 2) + 1) @(posedge clk); // run into an arbitrary phase
         @(negedge clk);
         restart_i = 1'b1;
@@ -157,6 +164,7 @@ module tb_uart_tick_gen;
 
         span = 3 * n;
         observe_tick_pattern(n, span, first_tick, spacing_errors, consecutive_errors);
+        first_tick = first_tick + 1;   // observation cycles -> spec cycles (see above)
 
         check(tick_during_restart === 1'b0, "REQ-005",
               $sformatf("N=%0d: tick suppressed during the restart pulse cycle itself", n));

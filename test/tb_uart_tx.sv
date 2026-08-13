@@ -158,7 +158,12 @@ module tb_uart_tx;
     for (i = 0; i <= 10; i = i + 1) begin
       bit before_val, after_val;
       int boundary;
-      boundary = i * DIV_TX;
+      // SPEC 5.2 (amended this round): tx_line is REGISTERED, so the start
+      // bit begins the cycle AFTER acceptance, not on it. Bit interval i
+      // occupies cycles 1 + i*DIV_TX .. i*DIV_TX + DIV_TX, so the boundary
+      // grid is anchored at 1. The original anchor required a combinational
+      // path from tx_valid to tx_line, which no registered output can give.
+      boundary = 1 + i * DIV_TX;
       if (i == 0) begin
         // boundary 0 is the acceptance edge itself: line must already be
         // low (start bit) starting exactly here.
@@ -181,7 +186,7 @@ module tb_uart_tx;
       end
     end
     check(!period_errors, "REQ-002",
-          "each of the 10 bit-interval boundaries (frame 0xAA, transition at every boundary) lands exactly DIV_TX=434 cycles from the previous one");
+          "each of the 10 bit-interval boundaries (frame 0x55, transition at every boundary) lands exactly DIV_TX=434 cycles from the previous one, grid anchored one cycle after acceptance");
     advance_to(pos, 10 * DIV_TX + 2);
 
     // ---- REQ-004: handshake detail -- tx_ready falls the cycle after
@@ -197,7 +202,7 @@ module tb_uart_tx;
       end
       check(!ready_glitch, "REQ-004",
             "tx_ready falls the cycle after acceptance and stays low until the stop bit completes");
-      advance_to(pos, 10 * DIV_TX);
+      advance_to(pos, 1 + 10 * DIV_TX);   // same one-cycle anchor as REQ-002
       check(tx_ready === 1'b1, "REQ-004", "tx_ready rises again once the stop bit has completed");
       advance_to(pos, 10 * DIV_TX + 2);
     end
