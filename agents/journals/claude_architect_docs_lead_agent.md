@@ -155,3 +155,62 @@ the thing it exists to do, on the first module, without anyone planning it.
 ### Files-in-this-commit
 - docs/specs/SPEC-uart_lite.md
 - docs/specs/requirements.md
+
+---
+## [J-architect_docs_lead-0004] 2026-08-13T02:05:00Z | task:none | Correcting J-architect_docs_lead-0003: it claimed the RTL was correct and the specification alone was at fault. The RTL was defective, and the bench that said so was right
+
+### Trigger
+Direct measurement of the transmitter's start bit, taken after 0003 was
+committed.
+
+### The correction
+J-architect_docs_lead-0003 stated, in its own words: *"The implemented design is
+exactly right and the attempted correction was wrong... **the RTL is correct and
+neither of the two defects here is in it.**"*
+
+**That is false.** The RTL was defective. `uart_tick_gen` reloaded its counter
+to 1 instead of 0, and the transmitter's start bit was 433 clock cycles where
+REQ-002 requires 434. tb_writer's eight red REQ-005 checks were correct on the
+first return, and the fix landed at 27104a8.
+
+Per PROTOCOL §5 R3 this journal is append-only: 0003 stays exactly as written,
+wrong, and this entry is the correction. An entry that could be edited would
+leave no evidence that the wrong conclusion was ever held, and the wrong
+conclusion is the useful part of this record.
+
+### How the error was made, since that is the transferable part
+0003's measurement used byte 0x00 over nine low bit intervals and found the
+total span was exactly 9 x 434 = 3906 cycles. That looked decisive. It was not:
+with an all-zero byte the start bit and d0 are both low, so **there is no
+transition at the boundary between them**, and the measurement constrains only
+the SUM of the intervals. The defect moves one cycle from the start bit into
+d0's interval, which any sum-based measurement is blind to by construction.
+
+Re-measured with byte 0x01, where d0 = 1 forces a transition at that boundary,
+the start bit is 433 cycles and every following interval is 434. That is the
+whole defect, visible in one line of output.
+
+A second error compounded it: changing the reload to 0 made the transmitter
+bench go red, and 0003 read that as evidence the change was wrong. The
+transmitter bench went red for an unrelated reason — its own boundary grid was
+anchored on the acceptance cycle, which a registered output cannot satisfy
+(adjudicated at 0801a2d). One defect's symptom was read as evidence about a
+different defect.
+
+### What survives from 0003
+Its two amendments were right and stand: §5.1's anchor genuinely was off by one,
+and REQ-002 genuinely was dischargeable by a transmitter with a wrong first bit
+— indeed the bench passed it 265/265 against the defective design, which is that
+row's own coverage gap and is now closed. What 0003 got wrong is the conclusion
+it drew about where the fault lay, not the amendments it made.
+
+### This round's amendment
+§5.2 now states where the frame begins relative to acceptance: `tx_line` is
+registered, so the start bit begins the cycle **after** `tx_valid & tx_ready`,
+bit interval i occupies cycles `1 + i·DIV_TX` through `i·DIV_TX + DIV_TX`, and
+`tx_ready` rises again at `1 + 10·DIV_TX`. That is the same class of ambiguity
+as §5.1's, in the one place it had not yet been fixed, and it is what the
+transmitter bench's boundary grid had guessed wrong.
+
+### Files-in-this-commit
+- docs/specs/SPEC-uart_lite.md

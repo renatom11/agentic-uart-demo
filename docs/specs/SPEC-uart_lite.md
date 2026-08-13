@@ -83,7 +83,14 @@ later interval stays correct.
 | `tx_line` | out | 1 | serial output, registered, idles high |
 | `tx_busy` | out | 1 | high from acceptance until the stop bit completes |
 
-Each of the ten bit intervals is exactly `DIV_TX` = 434 clock cycles.
+**Frame start.** `tx_line` is a registered output, so it cannot change in the
+same cycle as the `tx_valid & tx_ready` that causes it. The start bit therefore
+begins in the cycle **after** acceptance. Counting the acceptance cycle as
+cycle 0, bit interval i occupies cycles `1 + i·DIV_TX` through
+`i·DIV_TX + DIV_TX`, and `tx_ready` rises again at cycle `1 + 10·DIV_TX`.
+
+Each of the ten bit intervals is exactly `DIV_TX` = 434 clock cycles, including
+the first.
 
 ### 5.3 `uart_rx`
 
