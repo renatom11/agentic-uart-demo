@@ -208,3 +208,57 @@ benches land, to remove the temptation to shape the lane around a known result.
 ### Files-in-this-commit
 - .github/workflows/sim.yml
 - .gitignore
+
+---
+## [J-orchestrator-0004] 2026-08-13T02:15:00Z | task:none | The suite is green at 609/609 and the module-ready gate is recorded UNSIGNED, because green was never the whole precondition
+
+### Trigger
+WO-0001 closed: benches returned (6c8d65c), design defect fixed (27104a8), bench
+defects adjudicated (0801a2d), specification amended and a false conclusion
+corrected (7923ab8).
+
+### The result
+609 checks, 609 pass, 0 fail, `bash test/run.sh` exit 0 under Icarus 12.0. The
+largest single check is REQ-011's far-end tolerance sweep: sender bit periods
+422 through 447, all 256 byte values at each, 6656 checks, driven by a bench
+model the blind seat wrote from the specification rather than by the design's
+own transmitter.
+
+### Why the gate is not signed
+The board's stated precondition was "the suite green at a stated SHA with every
+failure adjudicated". Both hold. I am still recording the module-ready gate as
+NOT SIGNED, because that precondition was incomplete when I wrote it and signing
+now would be signing to a bar I set before I knew what this round would surface:
+
+- No mutation campaign has run, so nothing establishes in general that these
+  benches would catch a defect. There is exactly one real data point — the suite
+  caught BUG-0001 on its first execution — and one found defect is not a
+  measured detection rate.
+- REQ-002 was dischargeable by a defective transmitter until this round, and the
+  bench passed it 265/265 against the buggy design. A row that goes green
+  against a design known to be wrong is not evidence, and I only know that
+  because something made it red.
+
+Both are now on the board as limitations rather than left for a reader to find.
+
+### What this round demonstrates about the framework, stated plainly
+A session that could not read the design wrote checks from the specification and
+found a real one-line defect in that design on the first run. Nobody planned the
+defect and nobody seeded it. That is the blinding regime doing exactly the thing
+it exists to do, and it is the single strongest piece of evidence this repository
+contains.
+
+The append-only journal did the second thing: J-architect_docs_lead-0003
+published a wrong conclusion — that the RTL was correct and the specification
+alone was at fault — and it is still there, unedited, with 0004 correcting it.
+The wrong turn is the useful part of that record.
+
+The enforcement caught me three times in this session: the genesis commit
+carrying another repository's journal history, a missing commit trailer, and an
+undeclared set of foreign journal seeds. The one thing it did NOT catch is the
+one I had to catch myself — staging my own bench corrections under tb_writer's
+name, which would have misrepresented what the blind session produced. No script
+can tell whose keystrokes made an edit. That residue belongs on the record.
+
+### Files-in-this-commit
+- tasks/BOARD.md
