@@ -416,3 +416,63 @@ stating rather than glossing.
 ### Files-in-this-commit
 - site/build.py
 - site/lifecycle_src.html
+
+## [J-orchestrator-0009] 2026-08-18T18:35:00Z | task:none | The benches get a page of their own: the sources were on the site but only reachable by clicking inside an animation
+
+### Trigger
+Sponsor request: put the testbenches on the site. They were already
+published — build.py reads rtl/, test/ and docs/specs/ into the lifecycle
+page's data — but only as click-targets inside the animated file boxes.
+A reader who wants to READ the benches had no page to open.
+
+### Inputs
+- site/build.py (main(), suite(), INDEX_TPL); site/lifecycle_src.html
+  tab bar; test/*.sv and test/run.sh; the cached suite log.
+
+### Reasoning
+A third page rather than an addition to either existing one: the
+overview argues, the lifecycle animates, and neither wants 1,378 lines
+of source in it. The page is GENERATED, never committed, on the same
+rule as the rest of the site — sources are read from the tree at build
+time and check counts come from the parsed suite log, so the page cannot
+claim a bench the repository does not have or a number the simulator did
+not print. Requirements per file are derived by scanning the file for
+REQ- ids rather than hand-listed, so the mapping cannot drift either.
+
+The highlighter is deliberately small and ordered: comments and strings
+are matched FIRST and the remainder is keyword-scanned, so a keyword
+inside a comment stays a comment. Everything is escaped in both paths.
+
+One editorial call: the page opens by pointing at tb_uart_tick_gen.sv
+line 24 — the three-property decomposition the bench author wrote before
+any run, which is the reason BUG-0001 was findable at all. The site
+already reports the bug; it did not say which authoring decision caught
+it, and that decision is the transferable part.
+
+### Actions
+- site/build.py: added hl() (SystemVerilog/shell highlighter), bench_page()
+  and BENCH_TPL; wired benches.html into main(); added the TESTBENCHES tab
+  to INDEX_TPL; moved the __main__ block to end-of-file so the template
+  is bound before main() runs.
+- site/lifecycle_src.html: TESTBENCHES tab, so all three pages carry the
+  same nav.
+
+### Evidence
+- python3 site/build.py -> "site built · 16 commits · 81 files · 609
+  checks · 17 requirements · 16 journal entries"; benches.html 144,065 bytes.
+- Structural check over the generated page: 6 TOC entries, 6 file
+  sections, 1,378 rendered code lines, span open/close delta 0, no raw
+  markup leak.
+- grep -c TESTBENCHES over the three built pages -> 1 each.
+
+### Outcome
+The benches are readable at benches.html, with line numbers, per-file
+check counts, the requirements each discharges, and a GitHub link per
+file. site/public stays gitignored; CI rebuilds and publishes.
+
+### Open-questions
+- none
+
+### Files-in-this-commit
+- site/build.py
+- site/lifecycle_src.html

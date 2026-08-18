@@ -202,6 +202,89 @@ STATICS = {
 }
 
 
+SV_KW = set("""module endmodule input output inout logic wire reg bit int integer parameter
+localparam always always_ff always_comb always_latch initial begin end if else case endcase
+default for while repeat forever task endtask function endfunction automatic return posedge
+negedge assign generate endgenerate genvar timescale package endpackage import typedef enum
+struct signed unsigned string void wait fork join disable break continue static const ref
+inside unique priority assert property clocking endclocking interface endinterface""".split())
+
+SV_SYS = re.compile(r'\$[a-z_]+')
+
+
+def hl(text):
+    """Minimal SystemVerilog/shell highlighter. Comments and strings win; keywords
+    are only matched in what is left, so a keyword inside a comment stays a comment."""
+    out = []
+    tok = re.compile(r'(//[^\n]*|/\*.*?\*/|#[^\n]*|"(?:[^"\\\n]|\\.)*")', re.S)
+    pos = 0
+    for m in tok.finditer(text):
+        out.append(('code', text[pos:m.start()]))
+        lit = m.group(0)
+        out.append(('str' if lit.startswith('"') else 'com', lit))
+        pos = m.end()
+    out.append(('code', text[pos:]))
+
+    def esc(t):
+        return t.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+
+    parts = []
+    for kind, t in out:
+        if kind != 'code':
+            parts.append(f'<span class="{kind}">{esc(t)}</span>')
+            continue
+        buf = ''
+        for w in re.split(r'(\W)', t):
+            if w in SV_KW:
+                buf += f'<span class="kw">{w}</span>'
+            elif SV_SYS.fullmatch(w or ''):
+                buf += f'<span class="sys">{esc(w)}</span>'
+            elif re.fullmatch(r"\d+'?[a-zA-Z]?[0-9a-fA-F_]*|\d+", w or ''):
+                buf += f'<span class="num">{w}</span>'
+            else:
+                buf += esc(w)
+        parts.append(buf)
+    html = ''.join(parts)
+    return ''.join(f'<span class="line">{ln or "&nbsp;"}</span>\n'
+                   for ln in html.split('\n'))
+
+
+def bench_page(benches):
+    """One browsable page carrying every testbench and the runner, in full."""
+    counts = {b['name']: b for b in benches}
+    files = sorted(sh('git', 'ls-files', 'test').split())
+    files = [f for f in files if f.endswith('.sv')] + [f for f in files if f.endswith('.sh')]
+
+    toc, blocks = [], []
+    for f in files:
+        name = os.path.basename(f)
+        slug = name.replace('.', '-')
+        body = open(os.path.join(ROOT, f), encoding='utf-8').read()
+        nlines = body.count('\n') + 1
+        b = counts.get(name[:-3]) if name.endswith('.sv') else None
+        reqs = sorted(set(re.findall(r'REQ-\d+', body)))
+        chip = (f'<span class="pill{"" if not b["fail"] else " bad"}">'
+                f'{b["pass"]}/{b["total"]}</span>' if b else
+                '<span class="pill neutral">runner</span>')
+        toc.append(f'<a class="tocitem" href="#{slug}"><span class="mono">{name}</span>'
+                   f'<span class="tocmeta">{nlines} lines &middot; '
+                   f'{b["total"] if b else "—"} checks</span></a>')
+        blocks.append(
+            f'<section class="filesec" id="{slug}">'
+            f'<h2 class="mono">{name}</h2>'
+            f'<p class="filemeta">{chip} &nbsp;<span class="mono dim">{f}</span> '
+            f'&nbsp;&middot;&nbsp; {nlines} lines'
+            + (f' &nbsp;&middot;&nbsp; discharges {", ".join(reqs)}' if reqs else '')
+            + f' &nbsp;&middot;&nbsp; <a href="https://github.com/{REPO}/blob/main/{f}">view on GitHub &#8599;</a>'
+            f'</p><pre class="src"><code>{hl(body)}</code></pre></section>')
+
+    total = sum(b['total'] for b in benches)
+    return BENCH_TPL.format(repo=REPO, total=total, nfiles=len(files),
+                            nlines=sum((open(os.path.join(ROOT, f), encoding='utf-8')
+                                        .read().count('\n') + 1) for f in files),
+                            toc=''.join(toc), blocks=''.join(blocks))
+
+
 def main():
     cs = commits()
     seen, steps = set(), []
@@ -270,6 +353,7 @@ def main():
         f'<tr><td class="mono sha"><a href="https://github.com/{REPO}/commit/{c["sha"]}">'
         f'{c["sha"]}</a></td><td class="mono seat">{c["agent"].replace("_", " ")}</td>'
         f'<td>{c["subject"]}</td></tr>' for c in cs)
+    open(os.path.join(PUB, 'benches.html'), 'w').write(bench_page(benches))
     open(os.path.join(PUB, 'index.html'), 'w').write(INDEX_TPL.format(
         repo=REPO, total=total, ncommits=len(steps), nreq=len(reqs), nfiles=len(seen),
         njournal=sum(len(v) for v in jr.values()), bench_rows=bench_rows, commit_rows=commit_rows))
@@ -337,6 +421,7 @@ code{{font-family:ui-monospace,monospace;font-size:.86em;background:var(--chip);
 <nav class="tabs">
   <a class="tab on" href="index.html">OVERVIEW</a>
   <a class="tab" href="lifecycle.html">LIFECYCLE</a>
+  <a class="tab" href="benches.html">TESTBENCHES</a>
   <a class="tab" href="https://github.com/{repo}">GITHUB &#8599;</a>
 </nav>
 <p class="kicker">{repo}</p>
@@ -395,6 +480,123 @@ session-level blinding. The module-ready gate is recorded <b>unsigned</b> for ex
 <div class="foot">Every figure on this page is read out of the repository at build time —
 the commit list, the file sets, the requirement rows and the check counts.
 Rebuild with <code>python3 site/build.py</code>.</div>
+</div></body></html>
+"""
+
+
+
+
+BENCH_TPL = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Testbenches &middot; agentic-uart-demo</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{{--bg:#f7f5f1;--panel:#fffefb;--ink:#191714;--ink2:#6b635a;--line:#ddd6cc;
+ --sig:#b45309;--ok:#15803d;--okbg:#e8f3ea;--bad:#b91c1c;--chip:#f1ede6;
+ --kw:#8a3ffc;--com:#7d8a72;--str:#0f766e;--num:#b45309;--sys:#4338ca;--gut:#b9b0a4}}
+@media (prefers-color-scheme:dark){{:root{{--bg:#141311;--panel:#1c1a17;--ink:#eeeae3;
+ --ink2:#9c948a;--line:#332f2a;--sig:#e8a33d;--ok:#5cc98a;--okbg:#172b1f;--bad:#e8837b;
+ --chip:#232019;--kw:#c39bff;--com:#87957c;--str:#5ec5b6;--num:#e8a33d;--sys:#9d92f5;
+ --gut:#4b463f}}}}
+*{{box-sizing:border-box}}
+body{{margin:0;background:var(--bg);color:var(--ink);
+ font:17px/1.65 Georgia,'Iowan Old Style','Times New Roman',serif}}
+.mono{{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}}
+.dim{{color:var(--ink2)}}
+.wrap{{max-width:980px;margin:0 auto;padding:0 1.3rem 5rem}}
+a{{color:var(--sig)}}
+.kicker{{font:600 .68rem ui-monospace,monospace;letter-spacing:.18em;text-transform:uppercase;
+ color:var(--sig);margin:1.6rem 0 .5rem}}
+.tabs{{display:flex;flex-wrap:wrap;gap:.4rem;padding:1.4rem 0 .2rem}}
+.tab{{border:1.5px solid var(--line);border-radius:999px;background:var(--panel);color:var(--ink2);
+ padding:.32rem .85rem;font:600 .68rem ui-monospace,monospace;letter-spacing:.08em;
+ text-transform:uppercase;text-decoration:none;white-space:nowrap}}
+.tab:hover{{border-color:var(--sig);color:var(--sig)}}
+.tab.on{{background:var(--sig);border-color:var(--sig);color:#fff}}
+h1{{font-size:clamp(1.8rem,4.2vw,2.6rem);line-height:1.1;margin:0 0 .6rem;letter-spacing:-.015em;
+ text-wrap:balance}}
+.lede{{font-size:1.08rem;color:var(--ink2);margin:0 0 1.4rem}}
+.stats{{display:flex;flex-wrap:wrap;gap:.55rem;margin:1.2rem 0}}
+.stat{{border:1px solid var(--line);border-radius:9px;background:var(--panel);padding:.5rem .8rem}}
+.stat b{{display:block;font:700 1.3rem ui-monospace,monospace;line-height:1.1}}
+.stat span{{font:500 .62rem ui-monospace,monospace;letter-spacing:.09em;text-transform:uppercase;
+ color:var(--ink2)}}
+.stat.good b{{color:var(--ok)}}
+.callout{{border:1px solid var(--line);border-left:3px solid var(--sig);border-radius:0 9px 9px 0;
+ background:var(--panel);padding:.9rem 1.1rem;margin:1.4rem 0;font-size:.97rem}}
+.callout b{{color:var(--sig)}}
+.toc{{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:.5rem;
+ margin:1.4rem 0 2.4rem}}
+.tocitem{{display:flex;flex-direction:column;gap:.15rem;border:1px solid var(--line);
+ border-radius:9px;background:var(--panel);padding:.6rem .75rem;text-decoration:none;
+ color:var(--ink);font-size:.85rem}}
+.tocitem:hover{{border-color:var(--sig)}}
+.tocmeta{{font:500 .62rem ui-monospace,monospace;letter-spacing:.06em;text-transform:uppercase;
+ color:var(--ink2)}}
+.filesec{{margin:3rem 0 0;scroll-margin-top:1rem}}
+.filesec h2{{font-size:1.15rem;margin:0 0 .3rem;letter-spacing:-.01em}}
+.filemeta{{font-size:.8rem;color:var(--ink2);margin:0 0 .7rem}}
+.pill{{font:700 .6rem ui-monospace,monospace;padding:.08rem .38rem;border-radius:4px;
+ border:1px solid var(--ok);color:var(--ok);background:var(--okbg)}}
+.pill.bad{{border-color:var(--bad);color:var(--bad);background:transparent}}
+.pill.neutral{{border-color:var(--line);color:var(--ink2);background:var(--chip)}}
+.src{{counter-reset:l;background:var(--panel);border:1px solid var(--line);border-radius:10px;
+ padding:.9rem 0;margin:0;overflow-x:auto;
+ font:13px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}}
+.src code{{display:block;min-width:max-content}}
+.line{{display:block;counter-increment:l;padding:0 1.1rem 0 0;white-space:pre}}
+.line::before{{content:counter(l);display:inline-block;width:3.4em;padding-right:1.1em;
+ text-align:right;color:var(--gut);user-select:none;-webkit-user-select:none}}
+.line:hover{{background:color-mix(in srgb,var(--sig) 7%,transparent)}}
+.kw{{color:var(--kw)}} .com{{color:var(--com);font-style:italic}} .str{{color:var(--str)}}
+.num{{color:var(--num)}} .sys{{color:var(--sys)}}
+code:not(.src code){{font-family:ui-monospace,monospace;font-size:.86em;background:var(--chip);
+ padding:.08rem .28rem;border-radius:4px}}
+.foot{{border-top:1px solid var(--line);margin-top:3.5rem;padding-top:1rem;color:var(--ink2);
+ font-size:.85rem}}
+.top{{display:inline-block;margin:.5rem 0 0;font:600 .62rem ui-monospace,monospace;
+ letter-spacing:.08em;text-transform:uppercase;color:var(--ink2);text-decoration:none}}
+.top:hover{{color:var(--sig)}}
+</style></head><body><div class="wrap" id="top">
+<nav class="tabs">
+  <a class="tab" href="index.html">OVERVIEW</a>
+  <a class="tab" href="lifecycle.html">LIFECYCLE</a>
+  <a class="tab on" href="benches.html">TESTBENCHES</a>
+  <a class="tab" href="https://github.com/{repo}">GITHUB &#8599;</a>
+</nav>
+<p class="kicker">{repo} &middot; test/</p>
+<h1>The testbenches, in full.</h1>
+<p class="lede">Every line was written by an agent session whose work order carried the
+specification and the numbered requirements, and deliberately withheld <code>rtl/**</code>. The
+author could not read the design it was grading. What follows is that output, unedited, with the
+check counts each file returned on its most recent run in continuous integration.</p>
+
+<div class="stats">
+<div class="stat good"><b>{total}</b><span>checks passing</span></div>
+<div class="stat"><b>{nfiles}</b><span>files</span></div>
+<div class="stat"><b>{nlines}</b><span>lines of bench</span></div>
+<div class="stat"><b>5.4&times;</b><span>bench : design</span></div>
+</div>
+
+<div class="callout">
+<b>Read <span class="mono">tb_uart_tick_gen.sv</span> first, from line 24.</b> Its header records a
+decision taken before any run: split the tick check into three independent properties — <i>where</i>
+the first tick lands, whether the <i>spacing</i> is exactly N, and whether tick is ever high twice
+running — &ldquo;precisely so a phase-only defect is not buried under a monolithic FAIL.&rdquo;
+That decision is why BUG-0001 was found. The spacing check passed: spacing is N whether the counter
+reloads to 0 or 1. Only the phase check could see the defect, and it did. A bench written with one
+aggregate &ldquo;does the pattern match&rdquo; assertion would have gone green on a broken UART.
+</div>
+
+<div class="toc">{toc}</div>
+
+{blocks}
+
+<div class="foot">Sources are read out of <code>test/</code> at build time and highlighted
+here; the check counts come from a real simulator run in CI, never from a figure typed by hand.
+No mutation campaign has run, so nothing here establishes in general that these benches would catch
+a defect — one real find is not a detection rate.
+<a class="top" href="#top">&uarr; back to top</a></div>
 </div></body></html>
 """
 
