@@ -1,6 +1,9 @@
 # WO-0002: Mutation campaign — the uart_lite bench suite (17 seeded defects)
 
-- **State**: `ISSUED`
+- **State**: `ACCEPTED` — adjudicated at `J-dv_lead-0003`, round 3 below.
+  Acceptance closes the *campaign*; it does not qualify the benches. Five classes
+  carry surviving REQUIRED cells, so `P1-module-ready` remains blocked
+  (charter §6.3).
 - **From** / **To**: dv_lead → auditor (the no-stake seeder), via orchestrator.
   *Summarizable*, **with the relay restriction in §0**.
 - **Spec basis**: `docs/specs/SPEC-uart_lite.md` §2, §3, §5.1–§5.5, §6;
@@ -353,6 +356,7 @@ on one campaign alone: coverage arithmetic is the SO- packet's job.
 | — | — | freeze: brief + seal committed, no defect exists | dv_lead | `J-dv_lead-0002` |
 | 1 | 2026-08-18 | **seeding: 19 diffs authored blind** (17 sealed intents + 2 near-miss controls), all applying clean and compiling; six findings filed, two against the orchestrator, none CRITICAL | auditor | `J-auditor-0001` · `4fe6014` |
 | 2 | 2026-08-18 | **operator run: 19 of 19 executed. 13 KILLED, 6 SURVIVED, 0 HANG, 0 COMPILE-FAIL.** Raw observations only — no scoring, no comparison against the seal, which this seat has not opened for this purpose | orchestrator | `J-orchestrator-0011` |
+| 3 | 2026-08-18 | **UNSEALING and adjudication.** The seal was opened by dv_lead for the first time, for this purpose. Scored: **9 clean kills, 4 partials, 1 undetected class, 3 SURVIVE predictions held**; 570 of 579 REQUIRED cells red, 9 misses, 5 out-of-prediction reds. Rulings issued on **F-06** (controls admitted, out of scoring) and **F-01/F-02** (blindness claim void for TX-1 and TG-1; no score withdrawn). Scorecard: `docs/reports/dv/WO-0002-adjudication.md` | dv_lead | `J-dv_lead-0003` |
 
 ### Round 2 — the operator's raw record
 
@@ -401,3 +405,70 @@ which sit outside the sealed surface and so have no predicted cells; and its
 **F-01/F-02** (both MAJOR, both concerning the orchestrator) bear on whether
 the blind held, which is a question about this campaign's validity and is
 dv_lead's to rule on, not the party the findings name.
+
+### Round 3 — the unsealing and the adjudication
+
+**The unsealing is recorded here, not by editing the seal.** The seal's State line
+remains `FROZEN — unopened.` byte-for-byte, and its sha256 at HEAD equals its
+sha256 at the freeze commit `c7762b0`
+(`ead9e4f73421dbb0924612b66279c46697ccd8be319a15ca24cdec88cb117f9c`, verified both
+ways). Its second copy in `J-dv_lead-0002` is likewise untouched. Wrong
+predictions are recorded *beside* the seal, in the scorecard and the journal,
+never inside it.
+
+The full scorecard — every miss, every out-of-prediction red, every survivor's
+disposition, and both rulings — is
+**`docs/reports/dv/WO-0002-adjudication.md`**. Summary only here:
+
+| | count |
+|---|---|
+| classes killed on **every** REQUIRED cell, with the sealed messages | **9** |
+| classes caught but with REQUIRED rows missed (partials) | **4** (TG-3, RX-1, FF-1, LT-3) |
+| classes **not detected at all** | **1** (RX-3) |
+| SURVIVE predictions that held exactly | **3** (TX-4, RX-4, LT-2) |
+| REQUIRED cells red / sealed | **570 / 579** |
+| misses (REQUIRED rows that stayed green) | **9** |
+| out-of-prediction reds (findings, never kills) | **5** |
+| vacuous rows: sealed in advance / newly found | **3 / 3** |
+| instrument controls (NM-1, NM-2) | out of scoring — **instrument check PASSED** |
+
+**Ruling on F-06.** The near-miss controls are **admitted as out-of-scoring
+instrument controls**: zero to the numerator, zero to the denominator, no cells
+scored against a seal that never named them. Their green is not a credit to the
+suite — it is the precondition that makes every other number in this campaign
+mean anything, since a suite that reddened at behaviour-preserving edits would
+make every red elsewhere suspect. The request was correct to make before the runs
+and is answered late; that is recorded rather than back-dated.
+
+**Ruling on F-01 / F-02 — the blind.** The freeze commit's subject line leaked two
+sealed items (the count of rows judged unable to fail, and a discriminating
+property of the suite's only bit-order check) into the seeder's mandated §4.1
+precheck; the spawn dispatch additionally opened `tasks/BOARD.md`, which carries
+TG-1's staked claim. The ruling, in full in the scorecard §9:
+
+- **No score is withdrawn and no mutant is re-run.** Every diff is the minimal
+  determined realisation of an intent the brief *published*, so the leak reached
+  no decision the seeder actually had. Verified by reading all 19 diffs against
+  their published intents.
+- **The blindness claim is VOID for TX-1 and TG-1**, and globally weakened to
+  "the seeder knew the suite's shape, not its content." This campaign may **not**
+  be cited as evidence that a seeder ignorant of the benches produced TX-1's
+  result.
+- **F-01 stays MAJOR.** Its stated CRITICAL trigger — an adjudication relying on
+  the leaked property without recording the exposure — was live, because the
+  palindrome result is the seal's showpiece. It is discharged by recording the
+  exposure at the point of reliance.
+- **Responsibility lands on both named parties**, and dv_lead takes its share
+  first: the hygiene rule the subject defeats is a rule dv_lead wrote, in this
+  packet, protecting a seal dv_lead froze — and dv_lead did not read the subject
+  line carrying its own freeze.
+
+**Campaign reproducibility.** dv_lead re-executed all 19 mutants independently
+before scoring. The `[REQ-nnn] FAIL` line sets are byte-identical to the operator's
+run for **19 of 19**. The relayed table is confirmed as measurement, not accepted
+as relay.
+
+**Obligations opened, not actioned** (the denominator may not move under a running
+campaign; adjudication completes with this round): eight coverage repairs listed
+in the scorecard §11, headed by REQ-008, which currently has a check that names it
+and no stimulus that exercises it.

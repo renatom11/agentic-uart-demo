@@ -392,3 +392,223 @@ on unqualified benches, and the qualification has not run yet.
 - test/wave/wv_rx.sv
 - test/wave/wv_tick_gen.sv
 - test/wave/wv_tx.sv
+
+## [J-dv_lead-0003] 2026-08-18T20:15:00Z | task:none | Unsealing WO-0002 and scoring it: nine clean kills, one class the suite never saw, and a ruling that the blind broke on two classes
+
+### Trigger
+Orchestrator dispatch, act 4 of WO-0002 — the scoring round, dispatch-only, no
+siblings. I froze the seal in round 1 (`J-dv_lead-0002`) before any defect
+existed; the auditor seeded 19 diffs blind (`4fe6014`, `J-auditor-0001`) and the
+orchestrator ran them (`1c06a20`, `J-orchestrator-0011`). This round opens the
+seal, scores it, dispositions every survivor, and rules on two audit findings the
+party they name cannot rule on.
+
+### Inputs
+- `agents/charters/dv_lead.md`, `agents/PROTOCOL.md`
+- `agents/handoffs/WO-0002-SEALED-predictions.md` — **my own seal, opened here for
+  the first time and for this purpose**; and `agents/handoffs/WO-0002-mutation-campaign.md`
+- `docs/reports/audit/audit-0001_wo-0002-seeding-integrity.md` (six findings, in
+  full) and `docs/reports/audit/WO-0002-manifest.md` (all 19 diffs, in full)
+- `docs/reports/audit/WO-0002-mutations/*.patch` — all 19 patches read against
+  their published intents (needed for the F-01 ruling)
+- `test/tb_uart_rx.sv`, `test/tb_uart_fifo.sv`, `test/tb_uart_lite.sv`,
+  `test/tb_uart_tick_gen.sv`, `test/run.sh`, `tools/campaign_run.sh` — bench sites
+  cited as grounds for the misses
+- `build/campaign/*.log` (the operator's raw run) and my own independent re-run
+- Commit `c7762b0`'s subject line, for the F-01 ruling
+- **RTL read this round, and I say so explicitly** (charter §8): the manifest
+  quotes all 19 diffs with their surrounding `rtl/**` context, and I read them to
+  rule on whether the leak could have steered any diff. This is post-freeze,
+  post-seal adjudication forensics, not test derivation — every prediction being
+  scored was authored at `J-dv_lead-0002` from specs and benches only, and nothing
+  read this round could have changed it, because the seal is byte-frozen and
+  verified so.
+
+### Reasoning
+**Why I re-ran the campaign before scoring it.** The operator's verdicts arrived as
+a table of bench-level reddening. My scoring rule is by *message*, not by bench,
+so a bench-level table cannot be scored against it at all — and a relayed table is
+a relay, not a measurement (L-B01). I re-executed all 19 mutants myself and
+compared the `[REQ-nnn] FAIL` line sets: byte-identical for 19 of 19. Only then
+did I score. The campaign is deterministic (fixed seeds, no wall-clock
+dependence), so this is a genuine reproduction rather than a coincidence.
+
+**Why four classes are partials rather than kills.** My own rule 1 says KILL
+requires *every* REQUIRED row of a class to go red with the named message. TG-3
+(1 of 4), RX-1 (274 of 276), FF-1 (9 of 10) and LT-3 (2 of 3) each left REQUIRED
+rows green. The operator's table called all four KILLED because the suite went
+red somewhere. Scoring them as kills would have been the easy read and would have
+made the campaign look much better; the rule I wrote before results existed
+forbids it, and the whole point of writing it then was to bind me now.
+
+**Why I ran experiments instead of asserting grounds.** Rule 2 requires each miss
+be named with *the reason the row could not see the defect*. For two of them I had
+a hypothesis and no evidence, and a hypothesis stated as a ground is exactly the
+unfalsifiable move I would refuse from anyone else. So: (a) for TG-3 I swept the
+bench's arbitrary pre-restart delay across five values and watched the red set
+move — `N=3` at +0, `N=2` at +1, none at +2, both at +3, none at +4 — which proves
+the row tests one counter phase rather than the suppression property, with
+detection probability ~1/N; (b) for the REQ-008 rows I ran a three-arm experiment
+(mutant+shipped bench, mutant+repaired stimulus, **unmutated**+repaired stimulus)
+so that the third arm isolates the cause. Arm C being green is what makes arm B's
+failure attributable to the mutation. Both experiments ran in scratch trees
+outside the repository; I changed no bench in the tree, because the denominator
+may not move under a running campaign (L-C08).
+
+**The REQ-008 discovery is the campaign's real yield.** RX-3 was the one class the
+suite did not detect at all, and the reason is structural rather than marginal:
+the case is preceded by a bad-stop frame, whose final driven bit leaves `rx_line`
+low, so the "glitch" that follows contains no falling edge and the receiver never
+starts a frame. Both rows therefore pass for *any* idle receiver, including one
+with false-start rejection deleted. Two checks name REQ-008, describe it in their
+message text, and cannot fail. This is the same pathology as the TX-4 mutation
+class — a green that checks nothing — except that here it was the bench doing it,
+and only mutation exposed it.
+
+**Where the seal was wrong, recorded and not smoothed.** Five out-of-prediction
+reds and nine misses, all against me. The three FF-2 flag rows are the ones worth
+naming: I predicted the flags would follow the control's trajectory, and so did
+the seeder's independent fidelity argument — both of us missed the coincident
+read-and-write-while-full case, where the DUT holds `level` at DEPTH while a
+spec-conformant FIFO decrements. `tb_uart_fifo`'s 10 000-operation random sweep
+caught what two readers of the design did not. That is the bench being better than
+its adjudicator's model of it, and it is worth more to me than a clean prediction
+would have been. Likewise the named `0xff` survivor died, and LT-3's drain-loop
+reasoning was wrong because the gating I looked for in the bench lives in the
+design's port wiring. I did not retro-fit any of these into kills; rule 5 exists
+precisely to stop me.
+
+**The F-01 ruling — the test I applied, and why it is not a wave-through.** The
+freeze commit's subject named the count of rows I judged unable to fail and the
+discriminating property of the suite's only bit-order check, and the §4.1 precheck
+delivered it straight into the blind. F-02 compounds it: the dispatch opened
+`tasks/BOARD.md`, which carries TG-1's staked claim. The question that decides
+validity is not "was there a leak" (there was) but "could the leak reach a
+decision the seeder actually had". The seeder had no discretion over *which*
+defects to seed — I published all 17 intents — so the only reachable decisions are
+placement and strength. I therefore read all 19 diffs against their published
+intents. TX-1 is a pure bit reversal of the shift-register load and TG-1 is a
+single reload constant; "MSB-first" and "one cycle early" each denote exactly one
+behaviour, so there was nothing for the leak to steer. Hence: scores stand,
+because a score measures the suite's response to a determined diff. But the
+*blindness claim* does not stand, and I will not let the two be conflated — TX-1
+is this campaign's most impressive-looking result and the subtlety a reader would
+credit to my seal was also sitting in the commit subject. Void the blindness claim
+for TX-1 and TG-1, permanently, travelling with every citation.
+
+I also had to decide whether F-01 becomes CRITICAL. The auditor set the trigger
+precisely: it does, if the adjudication relies on the leaked property without
+recording the exposure. My adjudication *does* rely on it. So I discharge the
+trigger by recording the exposure at the point of reliance rather than by avoiding
+reliance, and F-01 stays MAJOR.
+
+On responsibility, the auditor declined to adjudicate between me and the
+orchestrator and was right to. It lands on both and I take my share first: the
+hygiene rule that subject line defeats is a rule I wrote, in a packet I authored,
+protecting a seal I froze — and I did not read the subject line that carried my
+own freeze. Authoring a rule is not complying with it.
+
+**F-06 — why the controls are admitted but unscored.** They have no cells in the
+seal, so scoring them would manufacture the very "red outside the prediction" case
+the playbook calls a finding, for a mutant the seal never had a chance to classify.
+But declining them outright would throw away their real function: they are the
+instrument check, and their green is the precondition that makes every other red
+in the campaign meaningful. So: admitted, zero to numerator and denominator,
+recorded as instrument-validity PASSED. I re-derived NM-2's equivalence myself
+rather than accept it on the seeder's word.
+
+**What I refused to do.** I did not sign anything. Five classes carry surviving
+REQUIRED cells, and charter §6.3 makes a surviving REQUIRED mutation a gate block,
+so this campaign's own result blocks the gate I might otherwise have wanted to
+sign. I also did not repair any bench: the eight coverage obligations are real and
+urgent, but a repaired bench is not a qualified bench until re-measured, and doing
+the repairs inside the adjudication commit would blur the two.
+
+### Actions
+- Opened `agents/handoffs/WO-0002-SEALED-predictions.md` for the first time; **did
+  not edit it**, and verified its sha256 at HEAD equals its sha256 at `c7762b0`.
+- Re-executed all 19 mutants independently via `tools/campaign_run.sh` into a
+  private outdir; compared FAIL-line sets against the operator's run.
+- Scored all 17 sealed classes row-by-row and message-by-message against the seal.
+- Ran two falsification experiments in scratch trees (TG-3 phase sweep; REQ-008
+  three-arm isolation).
+- Wrote `docs/reports/dv/WO-0002-adjudication.md` — the scorecard, the nine misses,
+  the five findings, six vacuities, six survivor dispositions, and the F-06 and
+  F-01/F-02 rulings.
+- Appended round 3 to the campaign packet's Return log and set its State to
+  `ACCEPTED`, with the explicit note that acceptance closes the campaign and does
+  not qualify the benches.
+- Ran **no git write command**.
+
+### Evidence
+All commands runnable from a checkout at this SHA. The per-mutant logs under
+`build/campaign/` and the scratch experiment trees are **ephemeral artifacts**,
+stated as such; each regenerates from the commands below.
+
+- Precheck: `git log --oneline -1` → `1c06a20 operator: run the WO-0002 mutants and
+  record the raw verdicts`; `git status --porcelain` → empty.
+- Denominator unmoved (both empty):
+  `git diff 509173a c7762b0 -- rtl/ test/run.sh test/tb_uart_lite.sv test/tb_uart_tick_gen.sv test/tb_uart_fifo.sv test/tb_uart_tx.sv test/tb_uart_rx.sv`
+  and `git diff c7762b0 HEAD --stat -- rtl/ test/`.
+- Seal integrity:
+  `git show c7762b0:agents/handoffs/WO-0002-SEALED-predictions.md | sha256sum` and
+  the same at `HEAD` → both
+  `ead9e4f73421dbb0924612b66279c46697ccd8be319a15ca24cdec88cb117f9c`.
+- Campaign re-run: `bash tools/campaign_run.sh <outdir>` (Icarus Verilog 12.0,
+  240 s/mutant). FAIL-line sets byte-identical to the operator's run for 19/19
+  mutants (sha256 per mutant).
+- Per-bench failing-unit counts, measured (lite/tick_gen/fifo/tx/rx): TG-1
+  0/8/0/1/0; TG-2 0/8/0/2/0; TG-3 0/1/0/0/0; TX-1 1/0/0/241/0; TX-2 0/0/0/1/0;
+  TX-3 0/0/0/2/0; TX-4 all zero; RX-1 1/0/0/0/275; RX-2 0/0/0/0/11; RX-3 all zero;
+  RX-4 all zero; FF-1 2/0/7/0/0; FF-2 1/0/6/0/0; LT-1 3/0/0/0/0; LT-2 all zero;
+  LT-3 3/0/0/0/0; LT-4 1/0/0/1/0; NM-1 all zero; NM-2 all zero.
+- Sealed boundaries confirmed exactly: RX-1 REQ-011 green `P=422..432`, red
+  `P=433..447`; RX-2 green `P=422..439`, red `P=440..447`.
+- TX-1: exactly 240 REQ-003 rows red; the 16 green rows are exactly the sealed
+  list `0x00 0x18 0x24 0x3c 0x42 0x5a 0x66 0x7e 0x81 0x99 0xa5 0xbd 0xc3 0xdb 0xe7
+  0xff`; loopback printed `(240 mismatches)`.
+- TX-2: exactly one failing unit in 609, the sealed row.
+- REQ-006 latency: control 4110; RX-1 3894 (−216); RX-2 3958 (−152).
+- TG-3 phase sweep (scratch): extra pre-restart delay +0 → `N=3` red; +1 → `N=2`;
+  +2 → none; +3 → `N=2,N=3`; +4 → none. `N=27` and `N=434` never red.
+- REQ-008 three-arm experiment (scratch): A = RX-3 mutant + shipped bench →
+  291/291 green; B = RX-3 mutant + `bench_drive_bit(1'b1, 100)` inserted before the
+  glitch → `receiver has returned to idle (rx_busy low) after an abandoned false
+  start` **FAIL**, 287/291; C = unmutated RTL + the same bench edit → 291/291
+  green.
+- Scorecard: `docs/reports/dv/WO-0002-adjudication.md`.
+
+### Outcome
+Act 4 met. Delivered: the unsealing recorded beside the seal (never inside it);
+the scored tally — 9 clean kills, 4 partials, 1 undetected class, 3 SURVIVE
+predictions held, 570/579 REQUIRED cells red, 9 misses, 5 out-of-prediction reds,
+6 vacuous rows (3 sealed, 3 newly found); an individual disposition for each of the
+six survivors; and rulings on F-06 and F-01/F-02. Handoff: the committed scorecard
+plus the campaign packet's round-3 Return log.
+
+**Nothing was signed.** `P1-module-ready` stays UNSIGNED and is now blocked by this
+campaign's own result rather than by the absence of one: five classes carry
+surviving REQUIRED cells (charter §6.3). No `SO-` issues from this round.
+
+### Open-questions
+1. **Eight coverage obligations are open** (scorecard §11), headed by REQ-008,
+   which has two checks that name it and no stimulus that exercises it. They need
+   a work order; each repair re-opens the campaign question for the class it
+   touches.
+2. **The board sentence must change.** "No mutation campaign has been run" is now
+   false. Proposed replacement text is in scorecard §10.1; `tasks/BOARD.md` is
+   orchestrator scope, so this is a proposal and not an edit.
+3. **F-03 needs an ADR, and it is not mine to write.** The §4.1 precheck as worded
+   is the delivery mechanism for F-01; the fix (`git log -1 --format=%H` for
+   campaign-adjacent rounds) touches `agents/PROTOCOL.md`, outside my write scope.
+   Escalated to the orchestrator under PROTOCOL §11.
+4. **REQ-013 still has no executable owner**, and REQ-008 now joins it as a
+   requirement no row discharges. Both must be carried as declared gaps in any
+   future `SO-`.
+5. The blind rests on the seeder's self-report that `test/**` was never opened,
+   which is not mechanically enforceable here. Unchanged by this round; stated so
+   no reader mistakes disclosure discipline for a mechanism.
+
+### Files-in-this-commit
+- agents/handoffs/WO-0002-mutation-campaign.md
+- docs/reports/dv/WO-0002-adjudication.md
