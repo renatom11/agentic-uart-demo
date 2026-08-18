@@ -613,3 +613,76 @@ dv_lead's and is dispatched next.
 ### Files-in-this-commit
 - tools/campaign_run.sh
 - agents/handoffs/WO-0002-mutation-campaign.md
+
+## [J-orchestrator-0012] 2026-08-18T20:35:00Z | task:none | The campaign gets a page, the board stops saying no campaign has run, and the finding against me is published rather than summarised
+
+### Trigger
+Act 5, after dv_lead's adjudication landed (3511f8c, J-dv_lead-0003).
+The sponsor's question was "how do I know this code is good" - this
+commit publishes the answer, including the parts that are against the
+program and against me.
+
+### Inputs
+- docs/reports/dv/WO-0002-adjudication.md (whole), especially SS10.1's
+  proposed board sentence and SS9's F-01 ruling.
+- docs/reports/audit/audit-0001_wo-0002-seeding-integrity.md.
+- tasks/BOARD.md limitations block and gates table.
+
+### Reasoning
+Three decisions worth recording.
+
+The board sentence is dv_lead's OWN proposed wording, adopted verbatim
+rather than paraphrased. It is the adjudicating seat's account of its own
+campaign; a committer who rewrites it into something rounder is editing
+a verdict, which SS4.3 forbids in either direction.
+
+The evidence page derives every figure from the adjudication file at
+build time, and groups the classes exactly as that file groups them. My
+first classifier put the clean-kill count at 8 where the report says 9 -
+it read FF-2's verdict cell ("KILL on REQUIRED + 3 findings") as a
+different category. I fixed the classifier to the report's own grouping
+rather than publish a second, unreviewed tally: a page that re-groups
+the rows its source grouped has manufactured a rival number.
+
+The leak is on the page in its own section, naming the orchestrator as
+the party at fault, because the alternative is a site that reports a
+campaign's result while omitting the disclosure the adjudicating seat
+attached to it. dv ruled the blindness claim VOID for two classes and
+that the disclosure travels with every citation. This site is a
+citation.
+
+### Actions
+- tasks/BOARD.md: the "no mutation campaign has been run" bullet replaced
+  with dv_lead's proposed replacement verbatim; a new bullet records that
+  REQ-008 and REQ-013 have no row that discharges them; the module-ready
+  gate row updated - still UNSIGNED, now blocked by the campaign's result
+  rather than its absence.
+- site/build.py: campaign() parses the adjudication's scorecard;
+  evidence_page(); EVIDENCE tab on every page.
+- site/lifecycle_src.html: the same tab.
+
+### Evidence
+- python3 site/build.py -> "site built · 22 commits · 114 files · 609
+  checks · 17 requirements · 22 journal entries"; evidence.html written.
+- Derived counts close: 9 + 4 + 1 + 3 = 17 classes, equal to the
+  adjudication's own tally and its own grouping.
+- Rendered the built page in headless chromium and read it before
+  committing.
+
+### Outcome
+The campaign is published. The board no longer claims a campaign has not
+run, and no longer implies the suite is unmeasured; it now carries what
+was measured, including one class nothing detected and six checks that
+cannot do what their text says.
+
+### Open-questions
+- dv_lead escalates F-03's fix (campaign-adjacent rounds should precheck
+  with a command that prints no subject line) as needing an ADR, since
+  agents/PROTOCOL.md is outside its scope. Mine to route: it is a real
+  rule/check collision - the protocol mandates a precheck that is also a
+  leak channel - and it wants an ADR rather than a habit.
+
+### Files-in-this-commit
+- tasks/BOARD.md
+- site/build.py
+- site/lifecycle_src.html

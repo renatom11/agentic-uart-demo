@@ -428,6 +428,72 @@ def waves_page(vigs, total):
                            secs=''.join(secs))
 
 
+# ---------------------------------------------------------------- campaign
+# The seeded-defect campaign, read out of the committed artifacts rather than
+# typed: the scorecard rows come from the adjudication's own table, so this
+# page cannot claim a verdict the verification lead did not record.
+def campaign():
+    adj = os.path.join(ROOT, 'docs', 'reports', 'dv', 'WO-0002-adjudication.md')
+    if not os.path.exists(adj):
+        return None
+    text = open(adj, encoding='utf-8').read()
+
+    rows = []
+    for m in re.finditer(
+            r'^\| (TG-\d|TX-\d|RX-\d|FF-\d|LT-\d) \| (KILL|SURVIVE) \| '
+            r'(\d+) \| ([\d—-]+) \| ([\d*—-]+) \| ([\d*—-]+) \| \*\*(.+?)\*\* \|',
+            text, re.M):
+        cid, pred, req, red, missed, extra, verdict = m.groups()
+        rows.append(dict(id=cid, pred=pred, req=int(req),
+                         red=red.strip('*'), missed=missed.strip('*'),
+                         extra=extra.strip('*'), verdict=verdict))
+
+    def one(pat, default=''):
+        mm = re.search(pat, text, re.M)
+        return mm.group(1) if mm else default
+
+    manifest = os.path.join(ROOT, 'docs', 'reports', 'audit',
+                            'WO-0002-manifest.md')
+    audit = os.path.join(ROOT, 'docs', 'reports', 'audit',
+                         'audit-0001_wo-0002-seeding-integrity.md')
+    # Classify exactly as the adjudication does: its "killed on every REQUIRED
+    # cell" group includes FF-2, whose verdict cell reads "KILL on REQUIRED +
+    # 3 findings". A page that re-groups the rows its own source grouped is a
+    # page publishing a second, unreviewed tally.
+    killed = [r for r in rows if r['verdict'].startswith(('CLEAN', 'KILL on'))]
+    return dict(rows=rows,
+                nclean=len(killed),
+                npartial=sum(1 for r in rows if r['verdict'].startswith('PARTIAL')),
+                nmiss=sum(1 for r in rows if r['verdict'].startswith('MISS')),
+                nheld=sum(1 for r in rows if r['verdict'].startswith('PREDICTION')),
+                nrows=len(rows),
+                has_manifest=os.path.exists(manifest),
+                has_audit=os.path.exists(audit))
+
+
+def evidence_page(camp, total):
+    """The campaign, as a page. Every figure is the adjudication's own."""
+    def cls(v):
+        if v.startswith('CLEAN') or v.startswith('KILL on'):
+            return 'ok'
+        if v.startswith('PARTIAL'):
+            return 'warn'
+        if v.startswith('MISS'):
+            return 'bad'
+        return 'held'
+
+    rows = ''.join(
+        f'<tr class="{cls(r["verdict"])}"><td class="mono">{r["id"]}</td>'
+        f'<td class="mono dim">{r["pred"]}</td>'
+        f'<td class="num">{r["req"]}</td><td class="num">{r["red"]}</td>'
+        f'<td class="num">{r["missed"]}</td>'
+        f'<td>{wv.esc(r["verdict"])}</td></tr>' for r in camp['rows'])
+    return EVID_TPL.format(repo=REPO, total=total, rows=rows,
+                           nclean=camp['nclean'], npartial=camp['npartial'],
+                           nmiss=camp['nmiss'], nheld=camp['nheld'],
+                           nrows=camp['nrows'])
+
+
 def main():
     cs = commits()
     seen, steps = set(), []
@@ -496,6 +562,10 @@ def main():
         f'<tr><td class="mono sha"><a href="https://github.com/{REPO}/commit/{c["sha"]}">'
         f'{c["sha"]}</a></td><td class="mono seat">{c["agent"].replace("_", " ")}</td>'
         f'<td>{c["subject"]}</td></tr>' for c in cs)
+    camp = campaign()
+    if camp:
+        open(os.path.join(PUB, 'evidence.html'), 'w').write(
+            evidence_page(camp, total))
     vigs = vignettes('--run' in sys.argv)
     open(os.path.join(PUB, 'waves.html'), 'w').write(waves_page(vigs, total))
     open(os.path.join(PUB, 'benches.html'), 'w').write(bench_page(benches))
@@ -567,6 +637,7 @@ code{{font-family:ui-monospace,monospace;font-size:.86em;background:var(--chip);
   <a class="tab on" href="index.html">OVERVIEW</a>
   <a class="tab" href="lifecycle.html">LIFECYCLE</a>
   <a class="tab" href="waves.html">WAVEFORMS</a>
+  <a class="tab" href="evidence.html">EVIDENCE</a>
   <a class="tab" href="benches.html">TESTBENCHES</a>
   <a class="tab" href="https://github.com/{repo}">GITHUB &#8599;</a>
 </nav>
@@ -708,6 +779,7 @@ code:not(.src code){{font-family:ui-monospace,monospace;font-size:.86em;backgrou
   <a class="tab" href="index.html">OVERVIEW</a>
   <a class="tab" href="lifecycle.html">LIFECYCLE</a>
   <a class="tab" href="waves.html">WAVEFORMS</a>
+  <a class="tab" href="evidence.html">EVIDENCE</a>
   <a class="tab on" href="benches.html">TESTBENCHES</a>
   <a class="tab" href="https://github.com/{repo}">GITHUB &#8599;</a>
 </nav>
@@ -818,6 +890,7 @@ code{{font-family:ui-monospace,monospace;font-size:.86em;background:var(--chip);
   <a class="tab" href="index.html">OVERVIEW</a>
   <a class="tab" href="lifecycle.html">LIFECYCLE</a>
   <a class="tab on" href="waves.html">WAVEFORMS</a>
+  <a class="tab" href="evidence.html">EVIDENCE</a>
   <a class="tab" href="benches.html">TESTBENCHES</a>
   <a class="tab" href="https://github.com/{repo}">GITHUB &#8599;</a>
 </nav>
@@ -844,6 +917,166 @@ Nothing here is drawn by hand. <b>A vignette is not evidence of correctness</b> 
 staged scenario behaving as its specification says it should. What the checks are worth is a
 different question, answered by the suite and by the seeded-defect campaign, not by a picture.
 </div>
+</div></body></html>
+"""
+
+
+
+
+EVID_TPL = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Evidence &middot; agentic-uart-demo</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{{--bg:#f7f5f1;--panel:#fffefb;--ink:#191714;--ink2:#6b635a;--line:#ddd6cc;
+ --sig:#b45309;--ok:#15803d;--okbg:#e8f3ea;--bad:#b91c1c;--badbg:#fdeaea;
+ --warn:#a16207;--warnbg:#fdf4e3;--held:#4338ca;--heldbg:#eef2ff;--chip:#f1ede6}}
+@media (prefers-color-scheme:dark){{:root{{--bg:#141311;--panel:#1c1a17;--ink:#eeeae3;
+ --ink2:#9c948a;--line:#332f2a;--sig:#e8a33d;--ok:#5cc98a;--okbg:#172b1f;--bad:#e8837b;
+ --badbg:#2b1917;--warn:#d9a441;--warnbg:#2a2213;--held:#9d92f5;--heldbg:#221f33;
+ --chip:#232019}}}}
+*{{box-sizing:border-box}}
+body{{margin:0;background:var(--bg);color:var(--ink);
+ font:17px/1.65 Georgia,'Iowan Old Style','Times New Roman',serif}}
+.mono{{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}}
+.dim{{color:var(--ink2)}}
+.wrap{{max-width:880px;margin:0 auto;padding:0 1.3rem 5rem}}
+a{{color:var(--sig)}}
+.kicker{{font:600 .68rem ui-monospace,monospace;letter-spacing:.18em;text-transform:uppercase;
+ color:var(--sig);margin:1.6rem 0 .5rem}}
+.tabs{{display:flex;flex-wrap:wrap;gap:.4rem;padding:1.4rem 0 .2rem}}
+.tab{{border:1.5px solid var(--line);border-radius:999px;background:var(--panel);color:var(--ink2);
+ padding:.32rem .85rem;font:600 .68rem ui-monospace,monospace;letter-spacing:.08em;
+ text-transform:uppercase;text-decoration:none;white-space:nowrap}}
+.tab:hover{{border-color:var(--sig);color:var(--sig)}}
+.tab.on{{background:var(--sig);border-color:var(--sig);color:#fff}}
+h1{{font-size:clamp(1.8rem,4.2vw,2.6rem);line-height:1.1;margin:0 0 .6rem;
+ letter-spacing:-.015em;text-wrap:balance}}
+h2{{font-size:1.2rem;margin:2.6rem 0 .5rem;letter-spacing:-.01em}}
+.lede{{font-size:1.08rem;color:var(--ink2);margin:0 0 1.5rem}}
+.stats{{display:flex;flex-wrap:wrap;gap:.55rem;margin:1.3rem 0}}
+.stat{{border:1px solid var(--line);border-radius:9px;background:var(--panel);
+ padding:.5rem .8rem;min-width:106px}}
+.stat b{{display:block;font:700 1.35rem ui-monospace,monospace;line-height:1.1}}
+.stat span{{font:500 .6rem ui-monospace,monospace;letter-spacing:.08em;text-transform:uppercase;
+ color:var(--ink2)}}
+.stat.ok b{{color:var(--ok)}} .stat.warn b{{color:var(--warn)}}
+.stat.bad b{{color:var(--bad)}} .stat.held b{{color:var(--held)}}
+table{{width:100%;border-collapse:collapse;margin:.9rem 0;font-size:.87rem}}
+th{{text-align:left;font:600 .58rem ui-monospace,monospace;letter-spacing:.09em;
+ text-transform:uppercase;color:var(--ink2);border-bottom:1px solid var(--line);
+ padding:.35rem .4rem}}
+td{{padding:.36rem .4rem;border-bottom:1px solid var(--line);vertical-align:top}}
+td.num{{text-align:right;font-family:ui-monospace,monospace}}
+tr.ok td:last-child{{color:var(--ok)}}
+tr.warn td:last-child{{color:var(--warn)}}
+tr.bad td:last-child{{color:var(--bad);font-weight:700}}
+tr.held td:last-child{{color:var(--held)}}
+.callout{{border:1px solid var(--line);border-left:3px solid var(--sig);border-radius:0 9px 9px 0;
+ background:var(--panel);padding:.9rem 1.1rem;margin:1.4rem 0;font-size:.97rem}}
+.callout b{{color:var(--sig)}}
+.callout.bad{{border-left-color:var(--bad)}} .callout.bad b{{color:var(--bad)}}
+code{{font-family:ui-monospace,monospace;font-size:.86em;background:var(--chip);
+ padding:.08rem .28rem;border-radius:4px}}
+ul{{padding-left:1.15rem}} li{{margin:.35rem 0}}
+.foot{{border-top:1px solid var(--line);margin-top:3.2rem;padding-top:1rem;color:var(--ink2);
+ font-size:.85rem}}
+</style></head><body><div class="wrap">
+<nav class="tabs">
+  <a class="tab" href="index.html">OVERVIEW</a>
+  <a class="tab" href="lifecycle.html">LIFECYCLE</a>
+  <a class="tab" href="waves.html">WAVEFORMS</a>
+  <a class="tab on" href="evidence.html">EVIDENCE</a>
+  <a class="tab" href="benches.html">TESTBENCHES</a>
+  <a class="tab" href="https://github.com/{repo}">GITHUB &#8599;</a>
+</nav>
+<p class="kicker">{repo} &middot; WO-0002</p>
+<h1>How do you know the tests are any good?</h1>
+<p class="lede">A green suite is consistent with a suite that checks nothing. {total} passing
+checks say nothing on their own about whether those checks could see a defect. So defects were
+put in front of them on purpose — and this page is what happened, taken from the committed
+adjudication rather than summarised here.</p>
+
+<div class="callout">
+<b>The order is the whole method.</b> The verification lead wrote down, <em>before any defect
+existed</em>, which classes it expected to catch, in which rows, with the exact failure message
+text — and froze that file. The auditor then wrote the actual defects <em>blind</em>: forbidden
+from reading the predictions, and forbidden from reading the testbenches, so it aimed at the
+design rather than at the checks. A third seat applied them and recorded what happened without
+scoring it. Only then was the seal opened. Predictions written after the results are not
+predictions.
+</div>
+
+<div class="stats">
+<div class="stat ok"><b>{nclean}</b><span>caught exactly as predicted</span></div>
+<div class="stat warn"><b>{npartial}</b><span>caught, but not cleanly</span></div>
+<div class="stat bad"><b>{nmiss}</b><span>not caught at all</span></div>
+<div class="stat held"><b>{nheld}</b><span>predicted to survive, and did</span></div>
+<div class="stat"><b>{nrows}</b><span>classes scored</span></div>
+</div>
+
+<h2>The scorecard</h2>
+<p><b>Required</b> is how many individual checks the seal named for that class in advance;
+<b>red</b> is how many actually failed; <b>missed</b> is the difference. A class that reddens the
+suite but leaves a named check green is <em>not</em> scored as a kill — that rule was written
+before any result existed, and it is what turned four apparent successes into partials.</p>
+<table><thead><tr><th>class</th><th>predicted</th><th>required</th><th>red</th><th>missed</th>
+<th>verdict</th></tr></thead><tbody>{rows}</tbody></table>
+
+<div class="callout bad">
+<b>The result that matters most is the one in red.</b> One seeded defect — a receiver that no
+longer rejects a false start — was <em>not detected at all</em>, and the seal had predicted it
+would be. Worse, the adjudication proved by a three-arm experiment that the two rows meant to
+cover it stay green because of the <em>stimulus</em>, not because the receiver is correct. Two
+requirements are now recorded as having no check that discharges them.
+</div>
+
+<h2>What writing the predictions found, before a single defect existed</h2>
+<ul>
+<li><b>Six checks cannot do what their text claims.</b> Three were found while sealing the
+predictions and three more while scoring. The clearest: the only row in {total} whose text claims
+to verify bit order tests with <code>0xA5</code> — a bit-reversal palindrome. It passes
+identically on a transmitter that sends every byte backwards.</li>
+<li><b>The suite has no watchdog.</b> Three unbounded waits mean a defect that starves a handshake
+hangs the simulator instead of failing it. Every mutant was therefore run under an external
+timeout, and a hang is scored <em>no verdict</em> — never a kill, because failing to reach a
+verdict is not catching something.</li>
+<li><b>Two deliberate near-misses survived, as intended.</b> The auditor also seeded two changes
+it argued were behaviourally equivalent. Both survived. Had either "died", the campaign would be
+reddening at edits rather than detecting defects, and every other number here would be
+worthless.</li>
+</ul>
+
+<h2>The blind was broken, and by whom</h2>
+<div class="callout bad">
+<b>Disclosed rather than discovered later.</b> The commit that froze the predictions carried a
+descriptive subject line — naming the sealed class count and a discriminating property of one
+specific check. The seeding agent is required by protocol to run <code>git log</code> as its
+first act, so that subject was delivered straight into the blind. <b>That was the orchestrator's
+error</b>, and it was caught by the auditor, filed against the orchestrator, and adjudicated by
+the verification lead rather than by the party at fault. Consequence, as ruled: no score is
+withdrawn — the leaked facts could not change which defects were written, because the class list
+was already public — but the <b>blindness claim is void for two classes</b>, and that disclosure
+travels with every citation of this campaign.
+</div>
+
+<h2>What this licenses you to say</h2>
+<ul>
+<li>This suite detected <b>16 of 17</b> seeded defect classes, and reddened exactly the predicted
+checks with the predicted messages in <b>{nclean}</b> of them.</li>
+<li>It is evidence about <b>17 classes</b>. It is <b>not a detection rate</b>, and no ratio on
+this page should be read as one.</li>
+<li>The module-ready gate remains <b>unsigned</b> — and is now blocked by this campaign's
+<em>result</em> rather than by its absence.</li>
+</ul>
+
+<div class="foot">Every figure on this page is parsed at build time from
+<code>docs/reports/dv/WO-0002-adjudication.md</code>, the verification lead's committed
+scorecard, and the classes are grouped exactly as that document groups them. The defect diffs are
+committed under <code>docs/reports/audit/WO-0002-mutations/</code>; the seeding-integrity findings,
+including the two against the orchestrator, are at
+<code>docs/reports/audit/audit-0001_wo-0002-seeding-integrity.md</code>. Read them rather than
+this page.</div>
 </div></body></html>
 """
 

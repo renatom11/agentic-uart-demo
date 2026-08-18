@@ -63,7 +63,7 @@ from the restart to the first tick. Fixed at `27104a8`.
 | Gate | State |
 |---|---|
 | G0 — org ratification | Compressed by sponsor direction: the sponsor commissioned the work directly and delegated all calls to the orchestrator. Branch protection **not** configured; the append-only journal therefore holds by convention plus CI, not by server-side rule. Recorded here rather than claimed as satisfied. |
-| Module-ready — uart_lite | **NOT SIGNED.** The suite is green at `7923ab8` with every failure adjudicated, which was the stated precondition — but signing also requires the two limitations below to be dispositioned, and neither is. Recorded as unsigned rather than waved through. |
+| Module-ready — uart_lite | **NOT SIGNED — and now blocked by the campaign's result rather than by its absence.** Five classes carry surviving REQUIRED cells (dv_lead charter §6.3); eight obligations are logged at `docs/reports/dv/WO-0002-adjudication.md` §11.** The suite is green at `7923ab8` with every failure adjudicated, which was the stated precondition — but signing also requires the two limitations below to be dispositioned, and neither is. Recorded as unsigned rather than waved through. |
 
 ## Pending sponsor decisions
 
@@ -72,11 +72,23 @@ stated outcome: a working testbench worth showing.
 
 ## Known limitations, stated rather than discovered later
 
-- **No mutation campaign has been run.** Nothing establishes in general that
-  these benches would catch a defect. One data point exists and it is real
-  rather than seeded: the suite caught BUG-0001, a one-line off-by-one in the
-  design, on its first run. That is one defect found, not a measured detection
-  rate, and it is not a substitute for a campaign.
+- **A mutation campaign has been run and adjudicated** (WO-0002,
+  `J-dv_lead-0003`, adopting the adjudicating seat's own proposed wording):
+  17 spec-derived defect classes plus 2 equivalence controls, seeded blind by
+  the auditor against predictions sealed before any defect existed. 16 of 17
+  classes were detected; **9 reddened exactly the rows and messages named in
+  advance**; **1 (RX-3, false-start rejection) was not detected at all**, and
+  **6 checks were found unable to do what their text claims**. This is
+  evidence about 17 classes, not a detection rate. The blind is disclosed as
+  **broken for 2 classes** — the freeze commit's own subject line leaked
+  sealed material into the seeder's mandated precheck (audit F-01/F-02,
+  orchestrator's fault, adjudicated at `J-dv_lead-0003` §9).
+- **Two requirements have no row that discharges them.** REQ-008
+  (false-start rejection) and REQ-013 (synchroniser depth) are carried by no
+  executable check — REQ-008's rows stay green because of the stimulus rather
+  than the receiver, proven by a three-arm experiment in the adjudication;
+  REQ-013's property is not observable in RTL simulation at all and its
+  stated method is inspection.
 - **REQ-002 was dischargeable by a defective transmitter until this round.** The
   bench passed it 265/265 against the buggy design, because the row as written
   asked only for correct spacing between bit boundaries. A green row is not
