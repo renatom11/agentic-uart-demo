@@ -1,0 +1,12 @@
+--- a/rtl/uart_lite.sv
++++ b/rtl/uart_lite.sv
+@@ -34,7 +34,8 @@
+ 
+   uart_fifo #(.DEPTH(FIFO_DEPTH), .W(8)) u_fifo (
+     .clk(clk), .rst(rst),
+-    .wr_en(rxs), .wr_data(rxb),           // a framing error never writes
++    // LT-2 MUTATION (WO-0002): a framing error writes the FIFO
++    .wr_en(rxs | rxfe), .wr_data(rxb),
+     .rd_en(rx_valid & rx_ready), .rd_data(rx_data),
+     .full(ffull), .empty(fempty), .level(flevel)
+   );

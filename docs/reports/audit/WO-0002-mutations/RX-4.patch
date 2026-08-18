@@ -1,0 +1,18 @@
+--- a/rtl/uart_rx.sv
++++ b/rtl/uart_rx.sv
+@@ -16,10 +16,12 @@
+   output logic       rx_busy
+ );
+   // ---- two-flop synchroniser (s1, s2) plus one delay for edge detect -------
+-  logic s1, s2, s2_d;
++  // RX-4 MUTATION (WO-0002): one synchroniser flop instead of two
++  logic s1, s2_d;
++  wire  s2 = s1;
+   always_ff @(posedge clk) begin
+-    if (rst) begin s1 <= 1'b1; s2 <= 1'b1; s2_d <= 1'b1; end
+-    else     begin s1 <= rx_line; s2 <= s1; s2_d <= s2; end
++    if (rst) begin s1 <= 1'b1; s2_d <= 1'b1; end
++    else     begin s1 <= rx_line; s2_d <= s2; end
+   end
+   wire fall = s2_d & ~s2;
+ 

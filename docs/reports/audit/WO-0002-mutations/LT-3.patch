@@ -1,0 +1,11 @@
+--- a/rtl/uart_lite.sv
++++ b/rtl/uart_lite.sv
+@@ -39,7 +39,7 @@
+     .full(ffull), .empty(fempty), .level(flevel)
+   );
+ 
+-  assign rx_valid     = ~fempty;
++  assign rx_valid     = fempty;   // LT-3 MUTATION (WO-0002): rx_valid high exactly when empty
+   assign rx_frame_err = rxfe;
+ 
+   // Overrun is the top level's: the receiver cannot stall a serial line, so

@@ -1,0 +1,11 @@
+--- a/rtl/uart_tx.sv
++++ b/rtl/uart_tx.sv
+@@ -29,7 +29,7 @@
+       sh      <= 10'h3FF;
+       bitcnt  <= '0;
+       running <= 1'b0;
+-      tx_line <= 1'b1;
++      tx_line <= 1'b0;   // LT-4 MUTATION (WO-0002): tx_line resets low, not high
+     end else if (load) begin
+       sh      <= {1'b1, tx_data, 1'b0};
+       bitcnt  <= '0;

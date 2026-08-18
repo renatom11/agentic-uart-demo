@@ -1,0 +1,11 @@
+--- a/rtl/uart_tick_gen.sv
++++ b/rtl/uart_tick_gen.sv
+@@ -23,7 +23,7 @@
+ 
+   always_ff @(posedge clk) begin
+     if (rst || restart) begin
+-      cnt  <= '0;
++      cnt  <= CW'(1);   // TG-1 MUTATION (WO-0002): reload 1, first tick one cycle early
+       tick <= 1'b0;
+     end else if (cnt == CW'(N - 1)) begin
+       cnt  <= '0;

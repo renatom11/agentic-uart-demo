@@ -1,0 +1,13 @@
+--- a/rtl/uart_rx.sv
++++ b/rtl/uart_rx.sv
+@@ -50,8 +50,8 @@
+     end else if (running && tick) begin
+       tcnt <= t_next;
+       if (t_next == 8'd8) begin
+-        // start-bit confirmation: a line that has gone high again is noise
+-        if (s2) running <= 1'b0;
++        // RX-3 MUTATION (WO-0002): the confirmation sample is read and not acted on
++        if (s2) begin /* frame is no longer abandoned */ end
+       end else if (t_next >= 8'd24 && t_next <= 8'd136 && t_next[3:0] == 4'd8) begin
+         rx_byte <= {s2, rx_byte[7:1]};        // LSB first
+       end else if (t_next == 8'd152) begin

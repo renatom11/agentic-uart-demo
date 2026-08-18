@@ -1,0 +1,12 @@
+--- a/rtl/uart_tx.sv
++++ b/rtl/uart_tx.sv
+@@ -20,7 +20,8 @@
+   assign tx_ready = ~running;
+   assign tx_busy  = running;
+ 
+-  uart_tick_gen #(.N(DIV_TX)) u_tick (
++  // TX-3 MUTATION (WO-0002): every bit interval is 433 cycles, not DIV_TX = 434
++  uart_tick_gen #(.N(DIV_TX - 1)) u_tick (
+     .clk(clk), .rst(rst), .restart(load), .tick(tick)
+   );
+ 

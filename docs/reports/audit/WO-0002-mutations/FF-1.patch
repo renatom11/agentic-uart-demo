@@ -1,0 +1,12 @@
+--- a/rtl/uart_fifo.sv
++++ b/rtl/uart_fifo.sv
+@@ -20,7 +20,8 @@
+   logic [AW-1:0] wp, rp;
+   logic          do_wr, do_rd;
+ 
+-  assign full    = (level == ($clog2(DEPTH)+1)'(DEPTH));
++  // FF-1 MUTATION (WO-0002): full asserts one entry early, at level = DEPTH-1
++  assign full    = (level == ($clog2(DEPTH)+1)'(DEPTH-1));
+   assign empty   = (level == '0);
+   assign do_wr   = wr_en & ~full;
+   assign do_rd   = rd_en & ~empty;

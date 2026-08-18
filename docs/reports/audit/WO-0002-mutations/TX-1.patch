@@ -1,0 +1,13 @@
+--- a/rtl/uart_tx.sv
++++ b/rtl/uart_tx.sv
+@@ -31,7 +31,9 @@
+       running <= 1'b0;
+       tx_line <= 1'b1;
+     end else if (load) begin
+-      sh      <= {1'b1, tx_data, 1'b0};
++      // TX-1 MUTATION (WO-0002): data bits loaded reversed, so they leave MSB-first
++      sh      <= {1'b1, tx_data[0], tx_data[1], tx_data[2], tx_data[3],
++                        tx_data[4], tx_data[5], tx_data[6], tx_data[7], 1'b0};
+       bitcnt  <= '0;
+       running <= 1'b1;
+       tx_line <= 1'b0;                 // start bit begins in the next cycle

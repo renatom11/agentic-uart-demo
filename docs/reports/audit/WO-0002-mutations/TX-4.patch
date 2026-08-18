@@ -1,0 +1,11 @@
+--- a/rtl/uart_tx.sv
++++ b/rtl/uart_tx.sv
+@@ -18,7 +18,7 @@
+ 
+   assign load     = tx_valid & tx_ready;
+   assign tx_ready = ~running;
+-  assign tx_busy  = running;
++  assign tx_busy  = 1'b0;   // TX-4 MUTATION (WO-0002): tx_busy never asserts
+ 
+   uart_tick_gen #(.N(DIV_TX)) u_tick (
+     .clk(clk), .rst(rst), .restart(load), .tick(tick)

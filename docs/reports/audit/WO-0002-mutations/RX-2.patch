@@ -1,0 +1,12 @@
+--- a/rtl/uart_rx.sv
++++ b/rtl/uart_rx.sv
+@@ -33,7 +33,8 @@
+   assign rx_busy = running;
+   assign t_next  = tcnt + 8'd1;
+ 
+-  uart_tick_gen #(.N(DIV_OS)) u_os (
++  // RX-2 MUTATION (WO-0002): oversample tick period is 26 cycles, not DIV_OS = 27
++  uart_tick_gen #(.N(DIV_OS - 1)) u_os (
+     .clk(clk), .rst(rst), .restart(restart), .tick(tick)
+   );
+ 

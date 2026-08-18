@@ -1,0 +1,31 @@
+--- a/rtl/uart_fifo.sv
++++ b/rtl/uart_fifo.sv
+@@ -18,21 +18,21 @@
+   localparam int AW = $clog2(DEPTH);
+   logic [W-1:0]  mem [DEPTH];
+   logic [AW-1:0] wp, rp;
+-  logic          do_wr, do_rd;
++  logic          wr_fire, rd_fire;   // NM-1 MUTATION (WO-0002): near-miss control, rename only
+ 
+   assign full    = (level == ($clog2(DEPTH)+1)'(DEPTH));
+-  assign empty   = (level == '0);
+-  assign do_wr   = wr_en & ~full;
+-  assign do_rd   = rd_en & ~empty;
++  assign empty   = ~(|level);   // NM-1 MUTATION (WO-0002): equivalent rewrite
++  assign wr_fire = wr_en & ~full;
++  assign rd_fire = rd_en & ~empty;
+   assign rd_data = mem[rp];
+ 
+   always_ff @(posedge clk) begin
+     if (rst) begin
+       wp <= '0; rp <= '0; level <= '0;
+     end else begin
+-      if (do_wr) begin mem[wp] <= wr_data; wp <= wp + AW'(1); end
+-      if (do_rd) rp <= rp + AW'(1);
+-      case ({do_wr, do_rd})
++      if (wr_fire) begin mem[wp] <= wr_data; wp <= wp + AW'(1); end
++      if (rd_fire) rp <= rp + AW'(1);
++      case ({wr_fire, rd_fire})
+         2'b10:   level <= level + 1;
+         2'b01:   level <= level - 1;
+         default: level <= level;

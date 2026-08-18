@@ -1,0 +1,11 @@
+--- a/rtl/uart_tx.sv
++++ b/rtl/uart_tx.sv
+@@ -36,7 +36,7 @@
+       running <= 1'b1;
+       tx_line <= 1'b0;                 // start bit begins in the next cycle
+     end else if (running && tick) begin
+-      if (bitcnt == 4'd9) begin
++      if (bitcnt == 4'd8) begin   // TX-2 MUTATION (WO-0002): finish after nine intervals, no stop interval
+         running <= 1'b0;
+         tx_line <= 1'b1;               // return to idle
+       end else begin

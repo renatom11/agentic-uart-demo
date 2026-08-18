@@ -1,0 +1,11 @@
+--- a/rtl/uart_tick_gen.sv
++++ b/rtl/uart_tick_gen.sv
+@@ -29,7 +29,7 @@
+       cnt  <= '0;
+       tick <= 1'b1;
+     end else begin
+-      cnt  <= cnt + CW'(1);
++      cnt  <= CW'(cnt + 1);   // NM-2 MUTATION (WO-0002): near-miss control, equivalent rewrite
+       tick <= 1'b0;
+     end
+   end

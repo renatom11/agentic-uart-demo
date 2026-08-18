@@ -1,0 +1,24 @@
+--- a/rtl/uart_fifo.sv
++++ b/rtl/uart_fifo.sv
+@@ -22,7 +22,7 @@
+ 
+   assign full    = (level == ($clog2(DEPTH)+1)'(DEPTH));
+   assign empty   = (level == '0);
+-  assign do_wr   = wr_en & ~full;
++  assign do_wr   = wr_en;   // FF-2 MUTATION (WO-0002): a write while full is accepted
+   assign do_rd   = rd_en & ~empty;
+   assign rd_data = mem[rp];
+ 
+@@ -31,9 +31,10 @@
+       wp <= '0; rp <= '0; level <= '0;
+     end else begin
+       if (do_wr) begin mem[wp] <= wr_data; wp <= wp + AW'(1); end
+-      if (do_rd) rp <= rp + AW'(1);
++      // FF-2 MUTATION (WO-0002): a write while full drops the oldest entry
++      if (do_rd || (do_wr && full)) rp <= rp + AW'(1);
+       case ({do_wr, do_rd})
+-        2'b10:   level <= level + 1;
++        2'b10:   level <= full ? level : level + 1;   // FF-2 MUTATION (WO-0002)
+         2'b01:   level <= level - 1;
+         default: level <= level;
+       endcase
