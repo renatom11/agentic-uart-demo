@@ -81,3 +81,314 @@ session produced; it was reset before it was pushed.
 ### Files-in-this-commit
 - test/tb_uart_tick_gen.sv
 - test/tb_uart_tx.sv
+
+---
+## [J-dv_lead-0002] 2026-08-18T19:07:11Z | task:none | Five waveform vignettes, and the first mutation campaign sealed before a single defect exists
+
+### Trigger
+Orchestrator dispatch, this round: build a curated waveform vignette per module
+so the sponsor can *see* each one working, and — the load-bearing half — freeze
+the predictions for the first mutation campaign. `tasks/BOARD.md` states the
+program's honest position in terms: **"No mutation campaign has been run.
+Nothing establishes in general that these benches would catch a defect."** This
+entry is the first half of the answer, and it is only worth anything because it
+was written before the question could be looked up.
+
+### Inputs
+Read, in this order, and the order matters:
+
+- `agents/charters/dv_lead.md`, `agents/PROTOCOL.md` (§3, §4, §5, §6, §10),
+  `tasks/BOARD.md`.
+- `docs/specs/SPEC-uart_lite.md` (§2, §3, §4, §5.1–§5.5, §6) and
+  `docs/specs/requirements.md` (REQ-001…REQ-017) — **the sole basis for the
+  defect-class taxonomy.**
+- All five benches: `test/tb_uart_tick_gen.sv`, `test/tb_uart_fifo.sv`,
+  `test/tb_uart_tx.sv`, `test/tb_uart_rx.sv`, `test/tb_uart_lite.sv`, and
+  `test/run.sh` — read for **assertion text and iteration order only**, which
+  is what L-C09 requires before sealing an expected failure message.
+- `agents/handoffs/templates/CAMPAIGN-template.md`,
+  `agents/handoffs/templates/SEALED-predictions-template.md`,
+  `docs/playbooks/mutation-campaign.md`.
+- Journal entry `J-dv_lead-0001` (the BUG-0001 adjudication and the REQ-002
+  amendment whose effectiveness this campaign puts to the test).
+
+**Independence declaration.** No file under `rtl/` was read at any point this
+round — not for the taxonomy, not for the vignettes. The vignettes instantiate
+each module using only the port and parameter names the specification's §5
+interface tables declare. Two incidental exposures, disclosed because
+undisclosed exposure is the thing that rots a blinding claim: the VCDs the
+vignettes produce name some of the DUTs' internal signals in their `$var`
+headers (`uart_tick_gen.cnt`, `uart_rx.fall`, `uart_rx.t_next`), and I read
+those headers while measuring file sizes. That is output, not source, it
+happened after the seal was written, and it tells me nothing the spec did not.
+
+### Reasoning
+
+**Why the seal was written first, before a single line of the vignettes.**
+A seal's whole value is its position in time. Anything I read or built before
+writing it is inside its provenance; anything after is not. The vignettes touch
+the same five modules, so I authored and froze the predictions first and only
+then wrote a bench — which is why the independence declaration above can be
+unconditional instead of hedged.
+
+**Taxonomy: 17 classes, not the 8 asked for, and why the extra nine earn their
+place.** Eight classes can be chosen so that every one is loud. The interesting
+question is not "does the suite go red" but "does it go red *in the right row,
+for the right reason, and stay green where it should*". That needs pairs whose
+outcomes differ by a single row. So the taxonomy is built out of deliberate
+pairs:
+
+- **TG-1 / TG-2** — the same off-by-one in opposite directions. Both redden the
+  same eight `tb_uart_tick_gen` rows. They differ in exactly one row of
+  `tb_uart_tx`: `tx_ready rises again once the stop bit has completed`. If the
+  campaign returns identical row sets for the two, the suite noticed trouble
+  and did not measure direction.
+- **RX-1 / RX-2** — two ways for the receiver's sample grid to be wrong. Both
+  redden REQ-006. They separate on the far-end sweep: RX-1's green/red boundary
+  falls at P=432/433, RX-2's at P=439/440, and RX-2 leaves all 256 REQ-007 rows
+  green while RX-1 reddens 255 of them.
+- **FF-1 / FF-2** — two defects in the same `full` path, one moving `level` and
+  one moving the data. If they redden the same rows, the FIFO bench is
+  detecting "something near the full flag" and nothing finer.
+- **RX-1 / RX-3** — both redden the two REQ-008 rows. RX-1 reddens 274 more;
+  RX-3 reddens none.
+
+**Three classes are predicted to SURVIVE, deliberately, and naming them in
+advance is the point.** A campaign in which everything dies measures nothing:
+it cannot distinguish a suite with teeth from an apparatus that reddens at
+anything. So three classes make the RTL genuinely wrong against a numbered spec
+clause and are predicted to leave all 609 checks green:
+
+- **TX-4** (`tx_busy` never asserts) — PROTOCOL §10's owed
+  silently-always-pass class. `tx_busy` is read by exactly one row in the whole
+  suite, at reset, in the one state where the correct and defective designs
+  agree, and it is not a port of `uart_lite` so no other bench can reach it.
+- **RX-4** (one synchroniser flop instead of two) — REQ-013's Method column is
+  *inspection*, and `tb_uart_lite` prints `[REQ-013] SKIP` in its own output.
+  The requirement has no executable owner. The one row whose timing could have
+  noticed was deliberately given a twelve-cycle tolerance to absorb exactly
+  this latency.
+- **LT-2** (a framing error writes the FIFO) — the strongest of the three. The
+  suite's only top-level framing error arrives when the FIFO already holds 16
+  entries, so the illegal write is swallowed by the FIFO's own
+  write-while-full rule. The row that would catch it asserts, in its own
+  parenthetical, that "the framing-error byte" is absent — and it *is* absent,
+  for a reason unrelated to the clause the row quotes.
+
+**Three rows are vacuous at the base SHA, and I sealed that before any defect
+existed rather than discovering it afterwards.** Finding these was the most
+valuable part of the round:
+
+1. `tb_uart_fifo.sv:138` asserts `full === 1'b1` under the message
+   `full asserted exactly when level=DEPTH=16 after 16 writes`. It tests one
+   direction. A FIFO that fills at 15 passes it.
+2. `tb_uart_lite.sv:246` asserts `rx_overrun === 1'b0` after `rx_ovr_clr` under
+   the message `rx_ovr_clr clears rx_overrun`. It cannot tell "cleared" from
+   "was never set".
+3. `tb_uart_tx.sv:126,140` — the **only** row in the suite whose text claims to
+   check bit order uses `8'hA5`, which is a bit-reversal palindrome
+   (`1010_0101` reversed is itself). It compares an MSB-first wire against an
+   LSB-first expectation and finds them equal. I nearly sealed this row as a
+   TX-1 kill; catching it is why REQ-003's 240-of-256 arithmetic is in the seal
+   and the REQ-001 row is not.
+
+**The harness can hang instead of failing, at three named sites.** No bench
+arms a watchdog and `test/run.sh` arms no timeout, so a defect that starves
+`tx_ready` or `rx_strobe` produces no FAIL line and no `ALL CHECKS PASSED`
+line: `vvp` runs forever and `run.sh`'s guards, which only fire after `vvp`
+exits, never fire. The sites are `tb_uart_tx.sv:90-93`, `tb_uart_lite.sv:121-124`
+and the `fork…join` counting branches at `tb_uart_rx.sv:182-191,202-211`. The
+campaign packet therefore requires an external wall-clock timeout on every
+mutant, and the scoring rule dispositions a timeout as `NO-VERDICT — HANG`,
+never as a kill: a suite that wedges has not detected anything, it has stopped.
+
+**I declined to verify any prediction by hand-mutating the RTL.** My charter
+§3 tells me to spot-check a bench by mutating the module in a scratch tree.
+PROTOCOL §10 tells me a campaign's seal is committed before any defect exists.
+Here the second rule governs: a defect authored by me, now, to check my own
+prediction is a defect that exists before the seal is scored, and adjusting the
+seal after seeing it would turn a prediction into a description. The campaign
+*is* the spot-check, at seventeen times the scale. If a prediction is wrong it
+dies on the record, which is the arrangement I want.
+
+**Freeze discipline, stronger than the template's.** The template flips a State
+line to UNSEALED at adjudication. The seal I wrote never changes state and is
+never edited: unsealing, scores and findings are recorded beside it in the
+campaign packet's Return log. A prediction that can be edited after its result
+is not a prediction, and removing the only permitted edit removes the only way
+to launder one. The class → message mapping is restated in Evidence below so
+two append-only copies exist; if either is altered to fit a result, the other
+exposes it.
+
+**Vignettes: what I did not do.** The dispatch asked for a small divisor on the
+tx, rx and lite vignettes. I used the real ones (434, 27) and state the reason
+in each file's header: SPEC §5.2, §5.3 and §5.5 declare **no** divisor
+parameter on `uart_tx`, `uart_rx` or `uart_lite` — the constants live in
+`uart_pkg` per §4 — so a bench derived from the specification has no legal way
+to shrink them, and inventing one would have meant reading the design in the
+same round I was sealing predictions about it. `uart_tick_gen`'s `N` *is* a
+spec-declared parameter, so `wv_tick_gen` uses N=8 exactly as asked. The
+constraint the dispatch actually cared about — VCD size — is met by measurement
+instead: all five are under the 200 KiB ceiling, achieved by cutting per-cycle
+marker buses out of the dumps rather than by cutting scenarios.
+
+Three rejected vignette ideas, recorded because the rejected list is what an
+auditor mines: (a) a REQ-011 tolerance vignette — the sweep is 6 656
+comparisons over 26 sender periods and has no readable waveform at any zoom,
+which is precisely why `wv_lite`'s header states that a green loopback is not
+evidence about REQ-011; (b) an overrun vignette at the top level — it needs 17
+frames, ~74 000 cycles, and a VCD an order of magnitude over the ceiling, so
+the FIFO's full/ignore boundary is shown at module level in `wv_fifo` instead,
+where it costs 3 KB; (c) a back-to-back (REQ-012) vignette — 64 frames, same
+problem, and it shows nothing a single frame does not.
+
+### Actions
+- Authored `agents/handoffs/WO-0002-SEALED-predictions.md` — 17 classes, the
+  denominator, the three harness facts, the scoring rule, and the
+  seeder-blinding list. Frozen; never to be edited.
+- Authored `agents/handoffs/WO-0002-mutation-campaign.md` (state `ISSUED`) —
+  the cast, the read allowlist, the process bars, the 17 published intents
+  (classes only, no rows and no messages), the orchestrator's mechanics
+  including the mandatory external timeout, and an empty Return log.
+- Wrote five vignettes under `test/wave/` plus `test/wave/run_wave.sh`, and ran
+  every one.
+- Ran the full suite twice: once at `509173a` to fix the denominator, once at
+  the freeze tree to prove the vignettes changed nothing the suite compiles.
+- Verified `.gitignore` covers every generated artifact by command, not by
+  reading the file.
+
+### Evidence
+
+**§4.1 precheck**, at the start of the round, in `/workspace/agentic-uart-demo`:
+
+```
+$ git status --short
+                      (no output — clean tree)
+$ git log --oneline -1
+509173a The benches get a page of their own: 1372 lines of testbench readable
+        with line numbers, check counts and requirement mappings, generated
+        from the tree rather than typed
+```
+
+**Denominator, measured at `509173a`** — `bash test/run.sh`, Icarus Verilog
+12.0, exit 0, 1m08.5s:
+
+| bench | checks | pass | fail |
+|---|---|---|---|
+| tb_uart_tick_gen | 28 | 28 | 0 |
+| tb_uart_fifo | 13 | 13 | 0 |
+| tb_uart_tx | 265 | 265 | 0 |
+| tb_uart_rx | 291 | 291 | 0 |
+| tb_uart_lite | 12 | 12 | 0 |
+| **total** | **609** | **609** | **0** |
+
+**Control unchanged at the freeze tree** — `bash test/run.sh` re-run with
+`test/wave/**` present: exit 0, same 609/609. `test/run.sh:72-76` names its
+five benches literally, so nothing under `test/wave/` is compiled by the suite.
+
+**Vignettes** — `bash test/wave/run_wave.sh`, exit 0, all five under the
+204 800-byte ceiling the script enforces:
+
+| vignette | VCD bytes | observed, not asserted |
+|---|---|---|
+| `wv_tick_gen` | 2 792 | first tick at `cyc_since_anchor` = 8 after reset **and** after restart (N=8) |
+| `wv_tx` | 181 073 | wire order `start=0  d0..d7=11000101  stop=1` for 0xA3 — LSB-first confirmed against the header's prediction |
+| `wv_rx` | 185 558 | `rx_byte`=0x3a, strobe seen, no frame error; `spec_sample` pulses exactly **10** times at 432-cycle spacing |
+| `wv_fifo` | 3 058 | level 4 → push+pop leaves level 4 and advances head 0x11→0x22 → full at level 16 → 17th write changes nothing → drain to empty → pop-while-empty changes nothing |
+| `wv_lite` | 108 462 | 0xA3 round trip in 4 108 cycles, `rx_frame_err`=0, `rx_overrun`=0, FIFO empty after the pop |
+
+`wv_rx`'s marker grid was checked against the VCD rather than trusted:
+extracting the `spec_sample` identifier and its rising edges gives pulse deltas
+`[0, 432, 864, 1296, 1728, 2160, 2592, 3024, 3456, 3888]` — SPEC §5.3's
+216 + 432·n grid, ten samples, no more and no fewer.
+
+**gitignore, verified by command:**
+
+```
+$ git check-ignore -v build/wave/wv_tx.vcd
+.gitignore:11:build/	build/wave/wv_tx.vcd
+```
+
+`.out`, `.log`, `.compile.log` and `.vcd` under `build/` all resolve to the
+same rule; `*.vcd` at `.gitignore:12` is a second, independent net. No
+waveform, log or simulation binary is committed by this round.
+
+**The sealed mapping — independent append-only copy** (PROTOCOL §10 R-SEAL-1;
+the other copy is `agents/handoffs/WO-0002-SEALED-predictions.md`, and this one
+exists so neither can be quietly rewritten to fit a result):
+
+| id | module | class | verdict | REQUIRED | the discriminating expectation |
+|---|---|---|---|---|---|
+| TG-1 | tick_gen | anchor one cycle early (BUG-0001) | KILL | 9 | 8 × `…observed first tick at cycle N-1` + tx REQ-002 boundary row; **both REQ-004 rows stay green** |
+| TG-2 | tick_gen | anchor one cycle late | KILL | 10 | as TG-1 with `N+1`, **plus** `tx_ready rises again once the stop bit has completed` |
+| TG-3 | tick_gen | tick not suppressed during restart | KILL | 4 | `N=%0d: tick suppressed during the restart pulse cycle itself`, all four N |
+| TX-1 | tx | data bits MSB-first | KILL | 242 | 240 of 256 REQ-003 rows (16 palindromes green, first red `byte 0x01`); `loopback: … (240 mismatches)`; **the REQ-001 bit-order row stays green — 8'hA5 is a palindrome** |
+| TX-2 | tx | frame one bit period short | KILL | **1** | `tx_ready falls the cycle after acceptance and stays low until the stop bit completes` — and nothing else in 609 |
+| TX-3 | tx | bit period 433 | KILL | 2 | REQ-002 boundary row + the same REQ-004 glitch row; loopback stays green |
+| TX-4 | tx | `tx_busy` never asserts | **SURVIVE** | 0 | 609 green; `post-reset: tx_busy is low (idle)` passes |
+| RX-1 | rx | samples at boundary, not mid-bit | KILL | 276 | REQ-006 ×2, REQ-008 ×2, 255 of 256 REQ-007 (**only `byte 0xff` survives**), REQ-012, REQ-011 red for **P=433…447** and green for **P=422…432** |
+| RX-2 | rx | `DIV_OS` = 26 | KILL | 11 | REQ-006 ×2 (~3955 vs window [4105,4116]), REQ-011 red for **P=440…447** only; **all 256 REQ-007 rows and the loopback stay green** |
+| RX-3 | rx | false start not rejected | KILL | 2 | the two REQ-008 rows and no other REQUIRED cell |
+| RX-4 | rx | one synchroniser flop | **SURVIVE** | 0 | 609 green; REQ-013 is inspection-only and prints `SKIP` |
+| FF-1 | fifo | `full` off by one entry | KILL | 10 | `level==DEPTH=16 after 16 writes` + 6 more fifo rows + 3 lite rows; **`full asserted exactly when level=DEPTH=16 after 16 writes` stays green (vacuous)** |
+| FF-2 | fifo | write while full overwrites | KILL | 4 | `a write while full is silently ignored: level, full, and head unchanged` + order + fall-through + the lite order row; level/full/empty sweep rows stay green |
+| LT-1 | lite | `rx_overrun` not sticky | KILL | 3 | the three sticky rows; **`rx_ovr_clr clears rx_overrun` stays green (vacuous)** |
+| LT-2 | lite | framing error writes the FIFO | **SURVIVE** | 0 | 609 green; the only top-level framing error arrives at a full FIFO |
+| LT-3 | lite | `rx_valid` inverted | KILL | 3 | `one cycle after rst deasserts: rx_valid = 0 (FIFO empty)` + loopback + drain row |
+| LT-4 | lite | `tx_line` idles low out of reset | KILL | 2 | `one cycle after rst deasserts: tx_line = 1` and `post-reset: tx_line idles high` |
+
+14 KILL, 3 SURVIVE, across all five modules. **If all 17 kill, this seal was
+wrong three times, and the record will say so.**
+
+### Outcome
+DoD met. Both halves delivered: five vignettes with a runner, all run and all
+inside the size ceiling; and the campaign frozen — brief plus seal in one
+commit, before any defect exists, satisfying R-SEAL-1 in the form it requires
+(the seal is a file in this commit's own file list, not a sentence).
+
+Handoff: `agents/handoffs/WO-0002-mutation-campaign.md`, state `ISSUED`, to the
+auditor as blinded seeder via the orchestrator. The orchestrator records the
+freeze SHA in that packet's Return log at issue. Nothing from the sealed
+companion is relayed to anyone before adjudication, and campaign-adjacent
+commit subjects stay thin — a subject line naming a predicted row or message
+is a leak into the seeder's ambient exposure.
+
+No `SO-uart_lite` issues this round and none can: PROTOCOL §10 forbids a PASS
+on unqualified benches, and the qualification has not run yet.
+
+### Open-questions
+
+1. **A file appeared in the working tree that is not mine and not from my
+   round: `site/wave.py`, untracked, 216 lines, a VCD parser and SVG renderer
+   for the site.** The tree was clean at my precheck (output quoted above) and
+   `site/` is outside dv_lead's write scope (PROTOCOL §6), so I neither touched
+   nor staged it, and it is absent from my file list below. **The orchestrator
+   must stage this round's files by explicit path — a `git add -A` would sweep
+   `site/wave.py` into my commit and break R4 files-list equality and R7 path
+   isolation in one move.** If a concurrent seat is writing this workspace, the
+   spawn discipline in PROTOCOL §3 wants it declared.
+2. **`SPEC-uart_lite.md` §2 forward-references a "§8" that does not exist** —
+   "§8 states the tolerance requirement". The spec ends at §6. The tolerance
+   requirement is real and lives in `requirements.md` REQ-011, so nothing is
+   missing in substance, but the pointer is dangling and the spec is still
+   marked DRAFT. For architect_docs_lead.
+3. **REQ-013 has no executable owner.** Its Method is *inspection*, and the
+   only artifact that mentions it in simulation prints `SKIP`. RX-4 is the
+   class that measures this; whatever the campaign returns, no `SO-` may record
+   REQ-013 as a discharged row, and it should be carried as a declared gap.
+4. **The suite has no watchdog.** Three unbounded wait loops (named in
+   Reasoning) turn a whole class of defect into a hang rather than a failure.
+   The campaign works around it with an external timeout; the durable fix is a
+   simulation timeout in each bench, which is a `test/**` change I did not make
+   this round because it would have moved the denominator after the freeze.
+   Recorded as an obligation to act on after adjudication.
+
+### Files-in-this-commit
+- agents/handoffs/WO-0002-SEALED-predictions.md
+- agents/handoffs/WO-0002-mutation-campaign.md
+- test/wave/run_wave.sh
+- test/wave/wv_fifo.sv
+- test/wave/wv_lite.sv
+- test/wave/wv_rx.sv
+- test/wave/wv_tick_gen.sv
+- test/wave/wv_tx.sv
