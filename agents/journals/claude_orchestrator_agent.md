@@ -548,3 +548,68 @@ in flight.
 - site/build.py
 - site/lifecycle_src.html
 - .gitignore
+
+## [J-orchestrator-0011] 2026-08-18T19:52:00Z | task:none | The operator runs nineteen defects: thirteen killed, six survived, no hangs - and I record what happened without scoring it
+
+### Trigger
+Act 3 of WO-0002. The seal is frozen (c7762b0, J-dv_lead-0002) and the
+diffs are seeded blind (4fe6014, J-auditor-0001). The operator's part is
+to apply a table it did not compose and report what the suite did.
+
+### Inputs
+- docs/reports/audit/WO-0002-mutations/*.patch (19) and its README.
+- agents/handoffs/WO-0002-mutation-campaign.md SS4 (mechanics), SS5.
+- docs/reports/audit/audit-0001_wo-0002-seeding-integrity.md - the
+  seeding-round findings, two of which are against me.
+- NOT read for this act: WO-0002-SEALED-predictions.md. I committed it and
+  cannot unsee that it exists, but I did not open it to run or to
+  interpret these results, and nothing below compares an outcome to a
+  prediction.
+
+### Reasoning
+Three disciplines wired into tools/campaign_run.sh rather than kept in
+mind. Mutated source never enters the repository: each patch is applied
+to a scratch copy of rtl/ + test/ outside the tree, built there, and the
+scratch deleted - no mutant sits on any branch, mergeable or not. Every
+run is bounded: dv_lead's round found three unbounded wait loops in the
+suite, so a defect that starves a handshake hangs rather than fails, and
+an unbounded runner would sit on it forever; a timeout is recorded
+NO-VERDICT (HANG) and is never a kill, because failing to reach a verdict
+is not catching something. And the operator predicts nothing - the table
+in the packet is raw observation, with the interpretation left to the
+seat that froze the predictions.
+
+I deliberately did not compute a ratio. Thirteen of nineteen is a number
+this campaign's own brief forbids as a summary, because the six survivors
+are not one kind of thing: two are near-miss controls that were SUPPOSED
+to survive, and the rest are a mix the seal distinguishes and I cannot.
+
+### Actions
+- tools/campaign_run.sh (new): the operator's runner, parallel by four,
+  240 s timeout, scratch outside the tree.
+- Ran all 19. Result: 13 KILLED, 6 SURVIVED, 0 HANG, 0 COMPILE-FAIL.
+  Survivors: TX-4, RX-3, RX-4, LT-2, NM-1, NM-2.
+- agents/handoffs/WO-0002-mutation-campaign.md: rounds 1 and 2 appended to
+  the Return log, with the per-mutant table and an explicit statement of
+  what the table is not.
+
+### Evidence
+- bash tools/campaign_run.sh -> the summary block quoted in the Return
+  log; per-mutant logs under build/campaign/ (gitignored, regenerable).
+- Clean-suite baseline measured first: 609 checks, exit 0, 69 s wall
+  clock - which is what sized the 240 s timeout.
+- Both near-miss controls survived, which is the instrument check passing.
+
+### Outcome
+Act 3 complete. Act 4 - the scoring against the seal, the disposition of
+each survivor, and a ruling on whether the blind held given F-01 - is
+dv_lead's and is dispatched next.
+
+### Open-questions
+- F-01 and F-02 are MAJOR findings against me and bear on this campaign's
+  validity. I am not the party to rule on them: routed to dv_lead with
+  the scoring round, and reported to the sponsor unedited.
+
+### Files-in-this-commit
+- tools/campaign_run.sh
+- agents/handoffs/WO-0002-mutation-campaign.md

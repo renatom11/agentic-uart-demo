@@ -348,8 +348,56 @@ on one campaign alone: coverage arithmetic is the SO- packet's job.
      The frozen seal is never edited — rulings are issued beside it. The
      unsealing itself is recorded here, not by editing the seal. -->
 
-*(empty — no rounds have run)*
-
 | round | date | event | by | ref |
 |---|---|---|---|---|
 | — | — | freeze: brief + seal committed, no defect exists | dv_lead | `J-dv_lead-0002` |
+| 1 | 2026-08-18 | **seeding: 19 diffs authored blind** (17 sealed intents + 2 near-miss controls), all applying clean and compiling; six findings filed, two against the orchestrator, none CRITICAL | auditor | `J-auditor-0001` · `4fe6014` |
+| 2 | 2026-08-18 | **operator run: 19 of 19 executed. 13 KILLED, 6 SURVIVED, 0 HANG, 0 COMPILE-FAIL.** Raw observations only — no scoring, no comparison against the seal, which this seat has not opened for this purpose | orchestrator | `J-orchestrator-0011` |
+
+### Round 2 — the operator's raw record
+
+Every patch applied **unmodified** to a scratch copy of `rtl/` + `test/`
+outside the tree, built and run there under a 240 s wall-clock timeout, and
+the scratch deleted. No mutated source was committed, and no branch carries
+one. The runner is `tools/campaign_run.sh`; per-mutant logs are regenerated
+by re-running it.
+
+| id | verdict | benches reddened |
+|---|---|---|
+| TG-1 | KILLED | `tb_uart_tick_gen`, `tb_uart_tx` |
+| TG-2 | KILLED | `tb_uart_tick_gen`, `tb_uart_tx` |
+| TG-3 | KILLED | `tb_uart_tick_gen` |
+| TX-1 | KILLED | `tb_uart_lite`, `tb_uart_tx` |
+| TX-2 | KILLED | `tb_uart_tx` |
+| TX-3 | KILLED | `tb_uart_tx` |
+| TX-4 | **SURVIVED** | — |
+| RX-1 | KILLED | `tb_uart_lite`, `tb_uart_rx` |
+| RX-2 | KILLED | `tb_uart_rx` |
+| RX-3 | **SURVIVED** | — |
+| RX-4 | **SURVIVED** | — |
+| FF-1 | KILLED | `tb_uart_fifo`, `tb_uart_lite` |
+| FF-2 | KILLED | `tb_uart_fifo`, `tb_uart_lite` |
+| LT-1 | KILLED | `tb_uart_lite` |
+| LT-2 | **SURVIVED** | — |
+| LT-3 | KILLED | `tb_uart_lite` |
+| LT-4 | KILLED | `tb_uart_lite`, `tb_uart_tx` |
+| NM-1 | **SURVIVED** | — (near-miss control) |
+| NM-2 | **SURVIVED** | — (near-miss control) |
+
+**What this table is not.** It is not a score. Which of the six survivors is
+a coverage gap, which is an equivalent design the suite could not have caught,
+and which was predicted to survive on a stated ground, are all questions the
+sealed predictions answer — and the seat that froze them adjudicates, in round
+3. A ratio computed from this table would be exactly the fold the campaign
+brief forbids.
+
+**Both near-miss controls survived**, which is the result they were authored
+to produce: the campaign measures behaviour rather than reddening at any edit
+to `rtl/`. Had either killed, the instrument would be the finding.
+
+**Two items owed to the adjudicating round**, carried here so they are not
+lost: the auditor's **F-06** asks for a disposition of the near-miss controls,
+which sit outside the sealed surface and so have no predicted cells; and its
+**F-01/F-02** (both MAJOR, both concerning the orchestrator) bear on whether
+the blind held, which is a question about this campaign's validity and is
+dv_lead's to rule on, not the party the findings name.
