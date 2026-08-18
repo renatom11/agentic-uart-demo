@@ -476,3 +476,75 @@ file. site/public stays gitignored; CI rebuilds and publishes.
 ### Files-in-this-commit
 - site/build.py
 - site/lifecycle_src.html
+
+## [J-orchestrator-0010] 2026-08-18T19:20:00Z | task:none | Waveforms on the site, parsed from real VCDs - and the flagship vignette needed two zoom panels before its own point was legible
+
+### Trigger
+Sponsor request: see waveforms for each module, and something that shows
+why the design is working. This entry covers the first half. The second
+half is the seeded-defect campaign, in flight: dv_lead's seal is frozen
+at c7762b0 and the auditor is seeding blind against it.
+
+### Inputs
+- test/wave/*.sv and test/wave/run_wave.sh at c7762b0 (dv_lead's
+  vignettes); build/wave/*.vcd and *.log from my own run of them.
+- site/build.py; site/lifecycle_src.html.
+
+### Reasoning
+Nothing on this site is typed by hand, and a waveform is no exception:
+site/wave.py parses the VCD the vignette actually produced and draws from
+it, so the picture cannot disagree with the design. The captions under
+each heading are the vignette's OWN printed description, read from its
+run log rather than written here — the seat that staged the scenario says
+what a reader should look at, and the site relays it.
+
+Two rendering decisions, both made by looking at the output rather than
+by reasoning about it. The clock is dropped from the three
+frame-length views: at 4,400 cycles across a 1,180-unit canvas a 50 MHz
+clock is a solid band, and the omission is stated on the page rather than
+left for a reader to notice. And the tick_gen vignette - the flagship,
+because it is the BUG-0001 site - was ILLEGIBLE at full span: its
+cyc_since_anchor bus changes every cycle, so the one value the whole
+vignette exists to show was an unreadable row of bowties. It now renders
+as two zoom panels, reset anchor and restart anchor, where the bus reads
+0000..0008 and tick rises visibly at 8. A picture whose subject cannot be
+read is a decoration.
+
+Also fixed by looking: overlapping mark labels at the left edge, now
+staggered onto two rows.
+
+### Actions
+- site/wave.py (new): VCD parser and SVG waveform renderer - scopes,
+  aliased ids, vectors, x/z, staggered annotations.
+- site/build.py: VIGNETTES manifest with per-vignette signal order and
+  zoom panels; vignettes() runs test/wave/run_wave.sh when the VCDs are
+  absent; waves_page(); WAVEFORMS tab.
+- site/lifecycle_src.html: the same tab, so all four pages agree.
+- .gitignore: __pycache__/.
+
+### Evidence
+- bash test/wave/run_wave.sh -> five VCDs, all inside the ceiling
+  (2,792 / 3,058 / 108,462 / 181,073 / 185,558 bytes).
+- python3 site/build.py -> "site built · 18 commits · 89 files · 609
+  checks · 17 requirements · 18 journal entries"; waves.html written.
+- Rendered the built page in headless chromium and READ it at two
+  crops before and after the panel change; the before shot is what
+  convicted the full-span tick_gen view.
+
+### Outcome
+waves.html publishes five vignettes, seven panels between them. The
+campaign that answers the harder half of the sponsor's question is
+in flight.
+
+### Open-questions
+- The pages workflow installs iverilog and runs the suite; vignettes()
+  will run the vignettes there too on the next publish. If a vignette
+  ever fails in CI the page silently omits it rather than failing the
+  build - deliberate for now, and worth a blocking check once the
+  campaign's own CI shape is settled.
+
+### Files-in-this-commit
+- site/wave.py
+- site/build.py
+- site/lifecycle_src.html
+- .gitignore

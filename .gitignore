@@ -12,6 +12,7 @@ build/
 *.vcd
 
 site/.suite.log
+__pycache__/
 
 # The site is built by CI from a live suite run, never committed stale
 site/public/

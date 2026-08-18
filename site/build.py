@@ -10,6 +10,8 @@ program it describes.
     python3 site/build.py --run      # re-runs the suite first (slow, authoritative)
 """
 import json, os, re, subprocess, sys, glob
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import wave as wv
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PUB = os.path.join(ROOT, 'site', 'public')
@@ -285,6 +287,147 @@ def bench_page(benches):
                             toc=''.join(toc), blocks=''.join(blocks))
 
 
+# ---------------------------------------------------------------- waveforms
+# One entry per vignette in test/wave/. `sig` is the curated display order:
+# the VCD carries more than a reader wants, and on the frame-length vignettes
+# the clock is 4,400 cycles wide and renders as a solid band, so it is left
+# out and the omission is stated on the page.
+VIGNETTES = [
+    dict(key='wv_tick_gen', mod='uart_tick_gen', req='REQ-005',
+         head='The phase of the first tick — the BUG-0001 site',
+         sig=['clk', 'rst', 'restart', 'cyc_since_anchor', 'dut.cnt', 'tick'],
+         clk=True,
+         panels=[(0, 300, 'Reset anchor. <code>rst</code> is sampled high in '
+                          'the cycle where <code>cyc_since_anchor</code> reads '
+                          '0. The first tick must land where it reads '
+                          '<b>8</b> — not 7, not 9.'),
+                 (600, 900, 'Restart anchor, mid-stream. The same contract '
+                            'from a restart pulse rather than from reset, '
+                            'which is the path the receiver actually uses to '
+                            're-align on every start bit.')]),
+    dict(key='wv_tx', mod='uart_tx', req='REQ-001…004',
+         head='One whole 8N1 frame, LSB-first',
+         sig=['tx_valid', 'tx_ready', 'tx_data', 'tx_busy', 'tx_line'],
+         clk=False,
+         panels=[(0, None, 'The whole frame. <code>tx_line</code> idles high, '
+                           'drops for the start bit, carries eight data bits '
+                           'and returns high for the stop bit.'),
+                 (0, 12000, 'The handshake and the start bit, zoomed. '
+                            '<code>tx_valid</code> and <code>tx_ready</code> '
+                            'are high together for exactly one cycle — that '
+                            'is the accept — and the start bit runs the full '
+                            'DIV_TX, the interval BUG-0001 made one cycle '
+                            'short.')]),
+    dict(key='wv_rx', mod='uart_rx', req='REQ-006…012',
+         head='Sampling in the middle of each bit cell',
+         sig=['rx_line', 'spec_sample', 'cell_idx', 'rx_busy', 'rx_byte',
+              'rx_strobe', 'rx_frame_err'],
+         clk=False,
+         panels=[(0, None, 'The whole received frame. Every '
+                           '<code>spec_sample</code> pulse sits in the middle '
+                           'of a bit cell on <code>rx_line</code>, never near '
+                           'an edge.'),
+                 (0, 14000, 'Start-bit detection and the first sample, '
+                            'zoomed. The mid-cell margin visible here is what '
+                            'buys tolerance to a far-end clock that is off.')]),
+    dict(key='wv_fifo', mod='uart_fifo', req='REQ-015',
+         head='Both flag boundaries, and the two writes that change nothing',
+         sig=['clk', 'wr_en', 'wr_data', 'rd_en', 'rd_data', 'level',
+              'full', 'empty'],
+         clk=True),
+    dict(key='wv_lite', mod='uart_lite', req='REQ-014, 016, 017',
+         head='A byte out and the same byte back',
+         sig=['tx_data', 'tx_valid', 'tx_ready', 'tx_line', 'rx_line',
+              'rx_valid', 'rx_data', 'rx_ready', 'rx_overrun', 'rx_frame_err'],
+         clk=False),
+]
+
+
+def vignettes(rerun):
+    """Run the vignettes if needed, then parse each VCD and its log.
+
+    Same rule as the rest of the site: if the artifacts are not there and
+    cannot be produced, the page says so rather than drawing something.
+    """
+    vdir = os.path.join(ROOT, 'build', 'wave')
+    have = glob.glob(os.path.join(vdir, '*.vcd'))
+    if rerun or not have:
+        subprocess.run(['bash', 'test/wave/run_wave.sh'], cwd=ROOT,
+                       capture_output=True, text=True)
+    out = []
+    for v in VIGNETTES:
+        vcd = os.path.join(vdir, v['key'] + '.vcd')
+        log = os.path.join(vdir, v['key'] + '.log')
+        if not os.path.exists(vcd):
+            continue
+        parsed = wv.parse_vcd(vcd)
+        by_name = {}
+        for sig in parsed['signals']:
+            short = sig['name'].split('.', 1)[1] if '.' in sig['name'] else sig['name']
+            by_name.setdefault(short, sig)
+        rows = [by_name[n] for n in v['sig'] if n in by_name]
+
+        lines = open(log).read().splitlines() if os.path.exists(log) else []
+        look = next((l.strip() for l in lines if l.strip().startswith('Look at')), '')
+        obs = [l.strip() for l in lines
+               if l.startswith('  ') and 'VCD:' not in l and l.strip()]
+
+        marks = []
+        rst = by_name.get('rst')
+        if rst:
+            drop = next((t for t, val in rst['changes'] if val == '0'), None)
+            if drop is not None:
+                marks.append((drop, 'reset released'))
+        for probe, label in (('tick', 'first tick'), ('rx_strobe', 'byte received'),
+                             ('rx_valid', 'byte available'), ('full', 'FIFO full'),
+                             ('tx_busy', 'frame starts')):
+            sg = by_name.get(probe)
+            if sg and any(r is sg for r in rows):
+                rise = next((t for t, val in sg['changes'] if val == '1'), None)
+                if rise is not None:
+                    marks.append((rise, label))
+        out.append(dict(v, rows=rows, end=parsed['end'], look=look, obs=obs,
+                        marks=marks, nsig=len(rows), lines=sum(len(r['changes'])
+                                                               for r in rows)))
+    return out
+
+
+def waves_page(vigs, total):
+    secs = []
+    for v in vigs:
+        panels = v.get('panels') or [(0, None, '')]
+        chunks = []
+        for t0_ns, t1_ns, cap in panels:
+            t0 = t0_ns * 1000
+            t1 = v['end'] if t1_ns is None else min(t1_ns * 1000, v['end'])
+            if t1 <= t0:
+                continue
+            chunks.append(
+                (f'<p class="pcap">{cap}</p>' if cap else '')
+                + wv.wave_svg(v['rows'], t0, t1, marks=v['marks'],
+                              title=v['mod']))
+        svg = ''.join(chunks)
+        obs = ''.join(f'<li>{wv.esc(o)}</li>' for o in v['obs'])
+        note = ('' if v['clk'] else
+                '<p class="omit">The clock is omitted from this view: the '
+                'vignette spans thousands of clock cycles, and at this width a '
+                '50&nbsp;MHz clock renders as a solid band. Every edge is in '
+                'the VCD; only the drawing leaves it out.</p>')
+        secs.append(
+            f'<section class="vig" id="{v["key"]}">'
+            f'<p class="vkick">{wv.esc(v["mod"])} &middot; {wv.esc(v["req"])}</p>'
+            f'<h2>{wv.esc(v["head"])}</h2>'
+            f'<p class="look">{wv.esc(v["look"])}</p>'
+            f'{svg}{note}'
+            f'<p class="obs-h">What the run printed</p><ul class="obs">{obs}</ul>'
+            f'<p class="src-l"><a href="https://github.com/{REPO}/blob/main/'
+            f'test/wave/{v["key"]}.sv">test/wave/{v["key"]}.sv &#8599;</a> '
+            f'&middot; {v["nsig"]} signals drawn &middot; '
+            f'{v["lines"]} transitions</p></section>')
+    return WAVE_TPL.format(repo=REPO, total=total, nvig=len(vigs),
+                           secs=''.join(secs))
+
+
 def main():
     cs = commits()
     seen, steps = set(), []
@@ -353,6 +496,8 @@ def main():
         f'<tr><td class="mono sha"><a href="https://github.com/{REPO}/commit/{c["sha"]}">'
         f'{c["sha"]}</a></td><td class="mono seat">{c["agent"].replace("_", " ")}</td>'
         f'<td>{c["subject"]}</td></tr>' for c in cs)
+    vigs = vignettes('--run' in sys.argv)
+    open(os.path.join(PUB, 'waves.html'), 'w').write(waves_page(vigs, total))
     open(os.path.join(PUB, 'benches.html'), 'w').write(bench_page(benches))
     open(os.path.join(PUB, 'index.html'), 'w').write(INDEX_TPL.format(
         repo=REPO, total=total, ncommits=len(steps), nreq=len(reqs), nfiles=len(seen),
@@ -421,6 +566,7 @@ code{{font-family:ui-monospace,monospace;font-size:.86em;background:var(--chip);
 <nav class="tabs">
   <a class="tab on" href="index.html">OVERVIEW</a>
   <a class="tab" href="lifecycle.html">LIFECYCLE</a>
+  <a class="tab" href="waves.html">WAVEFORMS</a>
   <a class="tab" href="benches.html">TESTBENCHES</a>
   <a class="tab" href="https://github.com/{repo}">GITHUB &#8599;</a>
 </nav>
@@ -561,6 +707,7 @@ code:not(.src code){{font-family:ui-monospace,monospace;font-size:.86em;backgrou
 <nav class="tabs">
   <a class="tab" href="index.html">OVERVIEW</a>
   <a class="tab" href="lifecycle.html">LIFECYCLE</a>
+  <a class="tab" href="waves.html">WAVEFORMS</a>
   <a class="tab on" href="benches.html">TESTBENCHES</a>
   <a class="tab" href="https://github.com/{repo}">GITHUB &#8599;</a>
 </nav>
@@ -597,6 +744,106 @@ here; the check counts come from a real simulator run in CI, never from a figure
 No mutation campaign has run, so nothing here establishes in general that these benches would catch
 a defect — one real find is not a detection rate.
 <a class="top" href="#top">&uarr; back to top</a></div>
+</div></body></html>
+"""
+
+
+
+
+WAVE_TPL = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Waveforms &middot; agentic-uart-demo</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{{--bg:#f7f5f1;--panel:#fffefb;--ink:#191714;--ink2:#6b635a;--line:#ddd6cc;
+ --sig:#b45309;--ok:#15803d;--bad:#b91c1c;--chip:#f1ede6;--bus:#4338ca;
+ --busf:#eef2ff;--grid:#e7e0d6}}
+@media (prefers-color-scheme:dark){{:root{{--bg:#141311;--panel:#1c1a17;--ink:#eeeae3;
+ --ink2:#9c948a;--line:#332f2a;--sig:#e8a33d;--ok:#5cc98a;--bad:#e8837b;--chip:#232019;
+ --bus:#9d92f5;--busf:#221f33;--grid:#2b2722}}}}
+*{{box-sizing:border-box}}
+body{{margin:0;background:var(--bg);color:var(--ink);
+ font:17px/1.65 Georgia,'Iowan Old Style','Times New Roman',serif}}
+.mono{{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}}
+.wrap{{max-width:1080px;margin:0 auto;padding:0 1.3rem 5rem}}
+a{{color:var(--sig)}}
+.kicker{{font:600 .68rem ui-monospace,monospace;letter-spacing:.18em;text-transform:uppercase;
+ color:var(--sig);margin:1.6rem 0 .5rem}}
+.tabs{{display:flex;flex-wrap:wrap;gap:.4rem;padding:1.4rem 0 .2rem}}
+.tab{{border:1.5px solid var(--line);border-radius:999px;background:var(--panel);color:var(--ink2);
+ padding:.32rem .85rem;font:600 .68rem ui-monospace,monospace;letter-spacing:.08em;
+ text-transform:uppercase;text-decoration:none;white-space:nowrap}}
+.tab:hover{{border-color:var(--sig);color:var(--sig)}}
+.tab.on{{background:var(--sig);border-color:var(--sig);color:#fff}}
+h1{{font-size:clamp(1.8rem,4.2vw,2.6rem);line-height:1.1;margin:0 0 .6rem;
+ letter-spacing:-.015em;text-wrap:balance}}
+.lede{{font-size:1.08rem;color:var(--ink2);margin:0 0 1.6rem}}
+.vig{{margin:3.2rem 0 0;scroll-margin-top:1rem}}
+.vkick{{font:600 .62rem ui-monospace,monospace;letter-spacing:.12em;text-transform:uppercase;
+ color:var(--sig);margin:0 0 .25rem}}
+.vig h2{{font-size:1.2rem;margin:0 0 .45rem;letter-spacing:-.01em;text-wrap:balance}}
+.look{{font-size:.97rem;color:var(--ink2);margin:0 0 .9rem;border-left:3px solid var(--sig);
+ padding-left:.9rem}}
+.pcap{{font-size:.88rem;color:var(--ink2);margin:1.1rem 0 .35rem}}
+.pcap b{{color:var(--ink)}}
+.wave{{width:100%;height:auto;display:block;background:var(--panel);
+ border:1px solid var(--line);border-radius:10px}}
+.wave .grid{{stroke:var(--grid);stroke-width:1}}
+.wave .base{{stroke:var(--grid);stroke-width:1}}
+.wave .w1{{fill:none;stroke:var(--ok);stroke-width:1.8;stroke-linejoin:round}}
+.wave .bus{{fill:var(--busf);stroke:var(--bus);stroke-width:1.3}}
+.wave .bus.bad{{fill:none;stroke:var(--bad)}}
+.wave .xz{{fill:var(--bad);opacity:.13}}
+.wave .slab{{font:600 12px ui-monospace,monospace;fill:var(--ink);text-anchor:end}}
+.wave .tlab{{font:500 10px ui-monospace,monospace;fill:var(--ink2);text-anchor:middle}}
+.wave .tunit{{font:500 10px ui-monospace,monospace;fill:var(--ink2);text-anchor:end}}
+.wave .bval{{font:600 11px ui-monospace,monospace;fill:var(--bus);text-anchor:middle}}
+.wave .mark{{stroke:var(--sig);stroke-width:1.3;stroke-dasharray:4 3}}
+.wave .mlab{{font:600 10px ui-monospace,monospace;fill:var(--sig)}}
+.omit{{font-size:.82rem;color:var(--ink2);margin:.55rem 0 0}}
+.obs-h{{font:600 .6rem ui-monospace,monospace;letter-spacing:.1em;text-transform:uppercase;
+ color:var(--ink2);margin:1.1rem 0 .3rem}}
+.obs{{margin:0;padding-left:1.1rem;font:13px/1.7 ui-monospace,monospace;color:var(--ink)}}
+.obs li{{margin:.1rem 0}}
+.src-l{{font-size:.78rem;color:var(--ink2);margin:.8rem 0 0}}
+.callout{{border:1px solid var(--line);border-left:3px solid var(--sig);border-radius:0 9px 9px 0;
+ background:var(--panel);padding:.9rem 1.1rem;margin:1.5rem 0;font-size:.97rem}}
+.callout b{{color:var(--sig)}}
+code{{font-family:ui-monospace,monospace;font-size:.86em;background:var(--chip);
+ padding:.08rem .28rem;border-radius:4px}}
+.foot{{border-top:1px solid var(--line);margin-top:3.5rem;padding-top:1rem;color:var(--ink2);
+ font-size:.85rem}}
+</style></head><body><div class="wrap">
+<nav class="tabs">
+  <a class="tab" href="index.html">OVERVIEW</a>
+  <a class="tab" href="lifecycle.html">LIFECYCLE</a>
+  <a class="tab on" href="waves.html">WAVEFORMS</a>
+  <a class="tab" href="benches.html">TESTBENCHES</a>
+  <a class="tab" href="https://github.com/{repo}">GITHUB &#8599;</a>
+</nav>
+<p class="kicker">{repo} &middot; test/wave/</p>
+<h1>What the design actually does, one picture per module.</h1>
+<p class="lede">{nvig} vignettes. Each is a short scenario staged on purpose, dumped
+to VCD by a real Icarus run at build time and drawn here from that file — so the picture cannot
+disagree with the design it claims to show. These are <em>demonstrations, not checks</em>:
+they contribute nothing to the {total}-check suite and are not run by it.</p>
+
+<div class="callout">
+<b>Why vignettes rather than a dump of the suite.</b> A full run of the receiver bench alone
+covers a 6,656-check tolerance sweep across 26 sender bit periods — a VCD nobody can read at any
+zoom. Each vignette instead stages the one scenario that makes its module's contract legible,
+and each says in its own header what a reader should look at. The verification lead wrote them;
+the text under each heading below is that file's own words, not a caption added here.
+</div>
+
+{secs}
+
+<div class="foot">Every waveform on this page is parsed from a VCD produced by Icarus Verilog
+12.0 during the site build, and every observation printed beneath it is that run's own stdout.
+Nothing here is drawn by hand. <b>A vignette is not evidence of correctness</b> — it shows one
+staged scenario behaving as its specification says it should. What the checks are worth is a
+different question, answered by the suite and by the seeded-defect campaign, not by a picture.
+</div>
 </div></body></html>
 """
 
